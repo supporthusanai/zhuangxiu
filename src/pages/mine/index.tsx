@@ -1,5 +1,7 @@
 import { View, Text, Image } from '@tarojs/components'
 import Taro from '@tarojs/taro'
+import { useState, useEffect } from 'react'
+import { getUserInfo, logout, UserInfo } from '@/utils/user'
 import './index.scss'
 
 interface MenuItem {
@@ -10,6 +12,8 @@ interface MenuItem {
 }
 
 export default function Mine() {
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
+
   const menuItems: MenuItem[] = [
     { id: 'orders', icon: '📋', title: '我的订单', subtitle: '查看装修进度' },
     { id: 'appointments', icon: '📅', title: '我的预约', subtitle: '设计师预约记录' },
@@ -19,15 +23,47 @@ export default function Mine() {
     { id: 'about', icon: 'ℹ️', title: '关于我们', subtitle: '了解更多' }
   ]
 
+  useEffect(() => {
+    loadUserInfo()
+  }, [])
+
+  // 加载用户信息
+  const loadUserInfo = () => {
+    const info = getUserInfo()
+    setUserInfo(info)
+  }
+
+  // 页面显示时重新加载用户信息
+  useEffect(() => {
+    Taro.useDidShow(() => {
+      loadUserInfo()
+    })
+  }, [])
+
   const handleLogin = () => {
-    Taro.showToast({
-      title: '登录功能待实现',
-      icon: 'none',
-      duration: 1500
+    Taro.navigateTo({
+      url: '/pages/login/index'
     })
   }
 
   const handleMenuItem = (itemId: string) => {
+    // 部分功能需要登录
+    const needLoginItems = ['orders', 'appointments', 'favorites']
+
+    if (needLoginItems.includes(itemId) && !userInfo?.isLogin) {
+      Taro.showModal({
+        title: '提示',
+        content: '该功能需要登录后使用',
+        confirmText: '去登录',
+        success: (res) => {
+          if (res.confirm) {
+            handleLogin()
+          }
+        }
+      })
+      return
+    }
+
     Taro.showToast({
       title: `打开${itemId}`,
       icon: 'none',
@@ -36,10 +72,31 @@ export default function Mine() {
   }
 
   const handleSetting = () => {
-    Taro.showToast({
-      title: '设置功能待实现',
-      icon: 'none',
-      duration: 1500
+    if (!userInfo?.isLogin) {
+      Taro.showToast({
+        title: '请先登录',
+        icon: 'none',
+        duration: 1500
+      })
+      return
+    }
+
+    Taro.showModal({
+      title: '设置',
+      content: '是否退出登录？',
+      confirmText: '退出',
+      confirmColor: '#ff6b6b',
+      success: (res) => {
+        if (res.confirm) {
+          logout()
+          setUserInfo(null)
+          Taro.showToast({
+            title: '已退出登录',
+            icon: 'success',
+            duration: 1500
+          })
+        }
+      }
     })
   }
 
@@ -49,15 +106,18 @@ export default function Mine() {
       <View className='user-section'>
         <View className='user-info'>
           <Image
-            src='https://via.placeholder.com/140x140/667eea/ffffff?text=头像'
+            src={userInfo?.avatar || 'https://via.placeholder.com/140x140/667eea/ffffff?text=头像'}
             className='user-avatar'
             mode='aspectFill'
+            onClick={!userInfo?.isLogin ? handleLogin : undefined}
           />
           <View className='user-details'>
-            <View className='user-name' onClick={handleLogin}>
-              点击登录
+            <View className='user-name' onClick={!userInfo?.isLogin ? handleLogin : undefined}>
+              {userInfo?.isLogin ? userInfo.nickname : '点击登录'}
             </View>
-            <View className='user-desc'>登录后享受更多服务</View>
+            <View className='user-desc'>
+              {userInfo?.isLogin ? (userInfo.phone || '已登录') : '登录后享受更多服务'}
+            </View>
           </View>
         </View>
         <View className='setting-icon' onClick={handleSetting}>

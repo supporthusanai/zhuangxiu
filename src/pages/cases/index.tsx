@@ -85,10 +85,8 @@ export default function Cases() {
   }
 
   const handleCaseDetail = (caseId: number) => {
-    Taro.showToast({
-      title: `查看案例 ${caseId} 详情`,
-      icon: 'none',
-      duration: 1500
+    Taro.navigateTo({
+      url: `/pages/case-detail/index?id=${caseId}`
     })
   }
 
