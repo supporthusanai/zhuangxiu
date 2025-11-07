@@ -1,7 +1,7 @@
 import { View, Text, Input, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useState } from 'react'
-import { mockLogin } from '@/utils/user'
+import { mockLogin, wechatLoginComplete } from '@/utils/user'
 import './index.scss'
 
 export default function Login() {
@@ -103,12 +103,12 @@ export default function Login() {
   // 微信一键登录（仅微信小程序）
   const handleWechatLogin = async () => {
     try {
-      // 获取微信授权
-      const { userInfo } = await Taro.getUserProfile({
-        desc: '用于完善用户资料'
-      })
+      setLoading(true)
 
-      console.log('微信用户信息', userInfo)
+      // 使用标准的微信登录流程
+      const userInfo = await wechatLoginComplete()
+
+      console.log('微信登录成功', userInfo)
 
       Taro.showToast({
         title: '登录成功',
@@ -125,13 +125,15 @@ export default function Login() {
           })
         }
       }, 1500)
-    } catch (error) {
+    } catch (error: any) {
       console.error('微信登录失败', error)
       Taro.showToast({
-        title: '授权失败',
+        title: error.message || '登录失败',
         icon: 'none',
         duration: 2000
       })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -206,11 +208,18 @@ export default function Login() {
           {/* 微信登录按钮 */}
           <Button
             className='wechat-login-btn'
+            loading={loading}
             onClick={handleWechatLogin}
           >
             <Text className='wechat-icon'>💬</Text>
             <Text>微信一键登录</Text>
           </Button>
+
+          {/* 说明文字 */}
+          <View className='wechat-tip'>
+            <Text className='tip-note'>• 首次登录将自动注册账号</Text>
+            <Text className='tip-note'>• 使用微信授权获取头像和昵称</Text>
+          </View>
         </View>
 
         {/* 用户协议 */}
