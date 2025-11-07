@@ -1,0 +1,211 @@
+.index-page {
+  padding-bottom: 120rpx;
+  background: #f5f5f5;
+}
+
+/* 轮播图 */
+.banner-section {
+  position: relative;
+  height: 400rpx;
+  background: #fff;
+}
+
+.banner-swiper {
+  height: 100%;
+}
+
+.banner-image {
+  width: 100%;
+  height: 100%;
+}
+
+.banner-title {
+  position: absolute;
+  bottom: 20rpx;
+  left: 30rpx;
+  color: #fff;
+  font-size: 36rpx;
+  font-weight: 600;
+  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.3);
+}
+
+/* 服务项目 */
+.services-section {
+  padding: 40rpx 30rpx;
+  background: #fff;
+  margin-top: 20rpx;
+}
+
+.section-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 30rpx;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20rpx;
+}
+
+.service-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.service-icon {
+  font-size: 60rpx;
+  margin-bottom: 16rpx;
+}
+
+.service-name {
+  font-size: 28rpx;
+  color: #333;
+  margin-bottom: 8rpx;
+}
+
+.service-desc {
+  font-size: 22rpx;
+  color: #999;
+}
+
+/* 精品案例 */
+.cases-section {
+  padding: 40rpx 30rpx;
+  background: #fff;
+  margin-top: 20rpx;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+.more-link {
+  font-size: 28rpx;
+  color: #667eea;
+}
+
+.cases-preview {
+  display: flex;
+  gap: 20rpx;
+  overflow-x: auto;
+}
+
+.case-card {
+  flex-shrink: 0;
+  width: 340rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.08);
+}
+
+.case-image {
+  width: 100%;
+  height: 240rpx;
+}
+
+.case-info {
+  padding: 20rpx;
+}
+
+.case-title {
+  font-size: 30rpx;
+  color: #333;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.case-tags {
+  display: flex;
+  gap: 12rpx;
+}
+
+.tag {
+  padding: 8rpx 16rpx;
+  background: #f0f0f0;
+  border-radius: 8rpx;
+  font-size: 24rpx;
+  color: #666;
+}
+
+/* 设计师推荐 */
+.designers-section {
+  padding: 40rpx 30rpx;
+  background: #fff;
+  margin-top: 20rpx;
+}
+
+.designer-card {
+  display: flex;
+  padding: 24rpx;
+  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+  border-radius: 16rpx;
+}
+
+.designer-avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 60rpx;
+  margin-right: 24rpx;
+}
+
+.designer-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.designer-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8rpx;
+}
+
+.designer-title {
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 16rpx;
+}
+
+.designer-tags {
+  display: flex;
+  gap: 12rpx;
+
+  .tag {
+    background: #fff;
+    color: #667eea;
+  }
+}
+
+/* 底部咨询按钮 */
+.consult-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20rpx 30rpx;
+  background: #fff;
+  box-shadow: 0 -4rpx 12rpx rgba(0, 0, 0, 0.05);
+  z-index: 100;
+}
+
+.consult-btn {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 44rpx;
+}
