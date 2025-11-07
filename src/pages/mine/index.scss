@@ -81,6 +81,57 @@
   color: #666;
 }
 
+/* 商家入口 */
+.merchant-entry {
+  background: #fff;
+  margin-top: 20rpx;
+  padding: 0 30rpx;
+}
+
+.merchant-entry-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+}
+
+.merchant-entry-left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.merchant-icon {
+  width: 80rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  text-align: center;
+  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+  border-radius: 50%;
+  font-size: 40rpx;
+}
+
+.merchant-text {
+  flex: 1;
+}
+
+.merchant-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8rpx;
+}
+
+.merchant-subtitle {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.merchant-entry-arrow {
+  font-size: 40rpx;
+  color: #ccc;
+}
+
 /* 功能菜单 */
 .menu-section {
   background: #fff;

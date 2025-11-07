@@ -2,6 +2,12 @@ import { View, Text, Image } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useState, useEffect } from 'react'
 import { getUserInfo, logout, UserInfo } from '@/utils/user'
+import {
+  getMerchantInfo,
+  getMerchantStatus,
+  getMerchantStatusName,
+  MerchantStatus
+} from '@/utils/merchant'
 import './index.scss'
 
 interface MenuItem {
@@ -13,6 +19,7 @@ interface MenuItem {
 
 export default function Mine() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
+  const [merchantStatus, setMerchantStatus] = useState<MerchantStatus>(MerchantStatus.NONE)
 
   const menuItems: MenuItem[] = [
     { id: 'orders', icon: '📋', title: '我的订单', subtitle: '查看装修进度' },
@@ -31,6 +38,10 @@ export default function Mine() {
   const loadUserInfo = () => {
     const info = getUserInfo()
     setUserInfo(info)
+
+    // 加载商家状态
+    const status = getMerchantStatus()
+    setMerchantStatus(status)
   }
 
   // 页面显示时重新加载用户信息
@@ -69,6 +80,36 @@ export default function Mine() {
       icon: 'none',
       duration: 1500
     })
+  }
+
+  // 处理商家中心入口
+  const handleMerchantCenter = () => {
+    if (!userInfo?.isLogin) {
+      Taro.showModal({
+        title: '提示',
+        content: '请先登录',
+        confirmText: '去登录',
+        success: (res) => {
+          if (res.confirm) {
+            handleLogin()
+          }
+        }
+      })
+      return
+    }
+
+    // 根据商家状态跳转
+    if (merchantStatus === MerchantStatus.NONE) {
+      // 未申请，跳转到申请页
+      Taro.navigateTo({
+        url: '/pages/merchant-apply/index'
+      })
+    } else {
+      // 已申请或已通过，跳转到商家中心
+      Taro.navigateTo({
+        url: '/pages/merchant-center/index'
+      })
+    }
   }
 
   const handleSetting = () => {
@@ -142,6 +183,26 @@ export default function Mine() {
         <View className='entry-item'>
           <View className='entry-value'>0</View>
           <View className='entry-label'>售后</View>
+        </View>
+      </View>
+
+      {/* 商家入口 */}
+      <View className='merchant-entry' onClick={handleMerchantCenter}>
+        <View className='merchant-entry-content'>
+          <View className='merchant-entry-left'>
+            <View className='merchant-icon'>🏢</View>
+            <View className='merchant-text'>
+              <View className='merchant-title'>
+                {merchantStatus === MerchantStatus.NONE ? '申请成为商家' : '商家中心'}
+              </View>
+              <View className='merchant-subtitle'>
+                {merchantStatus === MerchantStatus.NONE
+                  ? '装修公司/设计师入驻'
+                  : getMerchantStatusName(merchantStatus)}
+              </View>
+            </View>
+          </View>
+          <View className='merchant-entry-arrow'>›</View>
         </View>
       </View>
 

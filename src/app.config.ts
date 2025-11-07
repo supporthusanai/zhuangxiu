@@ -5,7 +5,9 @@ export default defineAppConfig({
     'pages/designers/index',
     'pages/mine/index',
     'pages/case-detail/index',
-    'pages/login/index'
+    'pages/login/index',
+    'pages/merchant-apply/index',
+    'pages/merchant-center/index'
   ],
   window: {
     backgroundTextStyle: 'light',
