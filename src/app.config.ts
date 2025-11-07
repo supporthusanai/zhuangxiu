@@ -7,7 +7,11 @@ export default defineAppConfig({
     'pages/case-detail/index',
     'pages/login/index',
     'pages/merchant-apply/index',
-    'pages/merchant-center/index'
+    'pages/merchant-center/index',
+    'pages/merchant-cases/index',
+    'pages/case-edit/index',
+    'pages/inquiries/index',
+    'pages/chat/index'
   ],
   window: {
     backgroundTextStyle: 'light',

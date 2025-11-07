@@ -1,0 +1,146 @@
+.chat-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f5f5f5;
+}
+
+/* 消息容器 */
+.messages-container {
+  flex: 1;
+  padding: 20rpx 30rpx;
+  padding-bottom: 40rpx;
+}
+
+.message-item {
+  display: flex;
+  margin-bottom: 32rpx;
+
+  &.self {
+    justify-content: flex-end;
+
+    .message-bubble {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+
+    .message-time {
+      text-align: right;
+    }
+  }
+
+  &.other {
+    justify-content: flex-start;
+
+    .message-bubble {
+      background: #fff;
+      color: #333;
+    }
+
+    .message-time {
+      text-align: left;
+    }
+  }
+}
+
+.message-content {
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.message-bubble {
+  padding: 24rpx 30rpx;
+  border-radius: 16rpx;
+  word-break: break-word;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.message-text {
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+
+.message-image {
+  max-width: 100%;
+  border-radius: 12rpx;
+  overflow: hidden;
+
+  image {
+    max-width: 100%;
+    display: block;
+  }
+}
+
+.message-case {
+  background: #fff;
+  border-radius: 12rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.08);
+}
+
+.case-image {
+  width: 100%;
+  height: 300rpx;
+}
+
+.case-title {
+  padding: 20rpx;
+  font-size: 26rpx;
+  color: #333;
+}
+
+.message-time {
+  font-size: 22rpx;
+  color: #999;
+}
+
+/* 输入栏 */
+.input-bar {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 20rpx 30rpx;
+  background: #fff;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.extra-btn {
+  width: 72rpx;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+  border-radius: 12rpx;
+  font-size: 40rpx;
+  flex-shrink: 0;
+}
+
+.message-input {
+  flex: 1;
+  height: 72rpx;
+  padding: 0 20rpx;
+  background: #f5f5f5;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+}
+
+.send-btn {
+  padding: 0 32rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  background: #e0e0e0;
+  color: #999;
+  font-size: 28rpx;
+  font-weight: 600;
+  border-radius: 12rpx;
+  transition: all 0.3s;
+  flex-shrink: 0;
+
+  &.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+  }
+}

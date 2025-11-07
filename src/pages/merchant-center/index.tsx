@@ -66,11 +66,32 @@ export default function MerchantCenter() {
       return
     }
 
-    Taro.showToast({
-      title: `打开${itemId}`,
-      icon: 'none',
-      duration: 1500
-    })
+    // 根据不同的菜单项跳转到对应页面
+    switch (itemId) {
+      case 'cases':
+        Taro.navigateTo({
+          url: '/pages/merchant-cases/index'
+        })
+        break
+      case 'inquiries':
+        Taro.navigateTo({
+          url: '/pages/inquiries/index'
+        })
+        break
+      case 'orders':
+      case 'appointments':
+      case 'finance':
+      case 'data':
+      case 'settings':
+        Taro.showToast({
+          title: '功能开发中',
+          icon: 'none',
+          duration: 1500
+        })
+        break
+      default:
+        break
+    }
   }
 
   const getStatusColor = (status: MerchantStatus): string => {
