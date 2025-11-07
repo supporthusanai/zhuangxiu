@@ -48,10 +48,22 @@ export default function Index() {
 
   // 预约咨询
   const handleConsult = () => {
-    Taro.showToast({
-      title: '预约成功，客服会尽快联系您',
-      icon: 'success',
-      duration: 2000
+    Taro.navigateTo({
+      url: '/pages/chat/index?type=consult'
+    })
+  }
+
+  // 跳转到案例详情
+  const navigateToCaseDetail = (caseId: number) => {
+    Taro.navigateTo({
+      url: `/pages/case-detail/index?id=${caseId}`
+    })
+  }
+
+  // 跳转到设计师详情
+  const navigateToDesignerDetail = (designerId: number) => {
+    Taro.navigateTo({
+      url: `/pages/designer-detail/index?id=${designerId}`
     })
   }
 
@@ -97,7 +109,7 @@ export default function Index() {
           <Text className='more-link' onClick={navigateToCases}>查看更多 →</Text>
         </View>
         <View className='cases-preview'>
-          <View className='case-card'>
+          <View className='case-card' onClick={() => navigateToCaseDetail(1)}>
             <Image
               src='https://via.placeholder.com/340x240/667eea/ffffff?text=案例1'
               className='case-image'
@@ -111,7 +123,7 @@ export default function Index() {
               </View>
             </View>
           </View>
-          <View className='case-card'>
+          <View className='case-card' onClick={() => navigateToCaseDetail(2)}>
             <Image
               src='https://via.placeholder.com/340x240/764ba2/ffffff?text=案例2'
               className='case-image'
@@ -134,7 +146,7 @@ export default function Index() {
           <View className='section-title'>明星设计师</View>
           <Text className='more-link' onClick={navigateToDesigners}>查看更多 →</Text>
         </View>
-        <View className='designer-card'>
+        <View className='designer-card' onClick={() => navigateToDesignerDetail(1)}>
           <Image
             src='https://via.placeholder.com/120x120/667eea/ffffff?text=设计师'
             className='designer-avatar'

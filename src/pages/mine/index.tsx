@@ -23,10 +23,11 @@ export default function Mine() {
 
   const menuItems: MenuItem[] = [
     { id: 'orders', icon: '📋', title: '我的订单', subtitle: '查看装修进度' },
+    { id: 'consultations', icon: '💬', title: '我的咨询', subtitle: '查看咨询记录' },
     { id: 'appointments', icon: '📅', title: '我的预约', subtitle: '设计师预约记录' },
     { id: 'favorites', icon: '❤️', title: '我的收藏', subtitle: '收藏的案例和设计' },
     { id: 'calculator', icon: '🧮', title: '装修计算器', subtitle: '快速估算装修费用' },
-    { id: 'customer-service', icon: '💬', title: '在线客服', subtitle: '7×24小时服务' },
+    { id: 'customer-service', icon: '📞', title: '在线客服', subtitle: '7×24小时服务' },
     { id: 'about', icon: 'ℹ️', title: '关于我们', subtitle: '了解更多' }
   ]
 
@@ -59,7 +60,7 @@ export default function Mine() {
 
   const handleMenuItem = (itemId: string) => {
     // 部分功能需要登录
-    const needLoginItems = ['orders', 'appointments', 'favorites']
+    const needLoginItems = ['orders', 'consultations', 'appointments', 'favorites']
 
     if (needLoginItems.includes(itemId) && !userInfo?.isLogin) {
       Taro.showModal({
@@ -75,11 +76,28 @@ export default function Mine() {
       return
     }
 
-    Taro.showToast({
-      title: `打开${itemId}`,
-      icon: 'none',
-      duration: 1500
-    })
+    // 根据不同菜单项跳转
+    switch (itemId) {
+      case 'consultations':
+        // 跳转到我的咨询页面（用户端咨询历史）
+        Taro.navigateTo({
+          url: '/pages/my-consultations/index'
+        })
+        break
+      case 'customer-service':
+        // 直接打开客服聊天
+        Taro.navigateTo({
+          url: '/pages/chat/index?type=consult'
+        })
+        break
+      default:
+        Taro.showToast({
+          title: '功能开发中',
+          icon: 'none',
+          duration: 1500
+        })
+        break
+    }
   }
 
   // 处理商家中心入口

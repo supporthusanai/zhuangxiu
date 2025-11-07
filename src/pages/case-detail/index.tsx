@@ -89,18 +89,9 @@ export default function CaseDetail() {
   }
 
   const handleConsultDesigner = () => {
-    Taro.showModal({
-      title: '咨询设计师',
-      content: '确认要预约该设计师咨询吗？',
-      success: (res) => {
-        if (res.confirm) {
-          Taro.showToast({
-            title: '预约成功',
-            icon: 'success',
-            duration: 2000
-          })
-        }
-      }
+    if (!caseDetail) return
+    Taro.navigateTo({
+      url: `/pages/chat/index?type=case&caseId=${caseDetail.id}&caseTitle=${encodeURIComponent(caseDetail.title)}&designerName=${encodeURIComponent(caseDetail.designer.name)}`
     })
   }
 
@@ -113,10 +104,9 @@ export default function CaseDetail() {
   }
 
   const handleViewDesigner = () => {
-    Taro.showToast({
-      title: '查看设计师详情',
-      icon: 'none',
-      duration: 1500
+    // 假设设计师 ID 为 1，实际应该从案例详情数据中获取
+    Taro.navigateTo({
+      url: '/pages/designer-detail/index?id=1'
     })
   }
 

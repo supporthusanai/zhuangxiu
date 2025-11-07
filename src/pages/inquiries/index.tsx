@@ -67,8 +67,9 @@ export default function Inquiries() {
   ])
 
   const handleChatClick = (inquiry: Inquiry) => {
+    const caseParam = inquiry.caseTitle ? `&caseTitle=${encodeURIComponent(inquiry.caseTitle)}` : ''
     Taro.navigateTo({
-      url: `/pages/chat/index?userId=${inquiry.userId}&userName=${inquiry.userName}`
+      url: `/pages/chat/index?type=inquiry&inquiryId=${inquiry.id}&userId=${inquiry.userId}&userName=${encodeURIComponent(inquiry.userName)}${caseParam}`
     })
   }
 

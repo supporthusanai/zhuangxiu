@@ -5,13 +5,15 @@ export default defineAppConfig({
     'pages/designers/index',
     'pages/mine/index',
     'pages/case-detail/index',
+    'pages/designer-detail/index',
     'pages/login/index',
     'pages/merchant-apply/index',
     'pages/merchant-center/index',
     'pages/merchant-cases/index',
     'pages/case-edit/index',
     'pages/inquiries/index',
-    'pages/chat/index'
+    'pages/chat/index',
+    'pages/my-consultations/index'
   ],
   window: {
     backgroundTextStyle: 'light',

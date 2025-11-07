@@ -79,26 +79,14 @@ export default function Designers() {
   ])
 
   const handleDesignerDetail = (designerId: number) => {
-    Taro.showToast({
-      title: `查看设计师 ${designerId} 详情`,
-      icon: 'none',
-      duration: 1500
+    Taro.navigateTo({
+      url: `/pages/designer-detail/index?id=${designerId}`
     })
   }
 
   const handleConsult = (designerId: number) => {
-    Taro.showModal({
-      title: '预约咨询',
-      content: '确认要预约该设计师吗？',
-      success: (res) => {
-        if (res.confirm) {
-          Taro.showToast({
-            title: '预约成功',
-            icon: 'success',
-            duration: 2000
-          })
-        }
-      }
+    Taro.navigateTo({
+      url: `/pages/chat/index?type=designer&designerId=${designerId}`
     })
   }
 
