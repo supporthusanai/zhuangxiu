@@ -84,6 +84,12 @@ export default function Mine() {
           url: '/pages/my-consultations/index'
         })
         break
+      case 'favorites':
+        // 跳转到我的收藏页面
+        Taro.navigateTo({
+          url: '/pages/my-favorites/index'
+        })
+        break
       case 'customer-service':
         // 直接打开客服聊天
         Taro.navigateTo({

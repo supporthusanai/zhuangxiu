@@ -1,6 +1,11 @@
 import { View, Text, Image, Swiper, SwiperItem, ScrollView } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useState, useEffect } from 'react'
+import {
+  isCaseFavorited,
+  addFavoriteCase,
+  removeFavoriteCase
+} from '@/utils/favorite'
 import './index.scss'
 
 interface CaseDetail {
@@ -39,6 +44,13 @@ export default function CaseDetail() {
     // 模拟加载案例详情数据
     loadCaseDetail(caseId)
   }, [])
+
+  // 检查是否已收藏
+  useEffect(() => {
+    if (caseDetail) {
+      setIsFavorite(isCaseFavorited(caseDetail.id))
+    }
+  }, [caseDetail])
 
   const loadCaseDetail = (id: string) => {
     // 模拟数据
@@ -80,12 +92,45 @@ export default function CaseDetail() {
   }
 
   const handleFavorite = () => {
-    setIsFavorite(!isFavorite)
-    Taro.showToast({
-      title: isFavorite ? '已取消收藏' : '收藏成功',
-      icon: 'success',
-      duration: 1500
-    })
+    if (!caseDetail) return
+
+    if (isFavorite) {
+      // 取消收藏
+      const success = removeFavoriteCase(caseDetail.id)
+      if (success) {
+        setIsFavorite(false)
+        Taro.showToast({
+          title: '已取消收藏',
+          icon: 'success',
+          duration: 1500
+        })
+      }
+    } else {
+      // 添加收藏
+      const success = addFavoriteCase({
+        id: caseDetail.id,
+        image: caseDetail.images[0],
+        title: caseDetail.title,
+        style: caseDetail.style,
+        area: caseDetail.area,
+        price: caseDetail.price,
+        designer: caseDetail.designer.name
+      })
+      if (success) {
+        setIsFavorite(true)
+        Taro.showToast({
+          title: '收藏成功',
+          icon: 'success',
+          duration: 1500
+        })
+      } else {
+        Taro.showToast({
+          title: '已经收藏过了',
+          icon: 'none',
+          duration: 1500
+        })
+      }
+    }
   }
 
   const handleConsultDesigner = () => {

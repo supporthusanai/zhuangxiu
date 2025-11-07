@@ -13,7 +13,8 @@ export default defineAppConfig({
     'pages/case-edit/index',
     'pages/inquiries/index',
     'pages/chat/index',
-    'pages/my-consultations/index'
+    'pages/my-consultations/index',
+    'pages/my-favorites/index'
   ],
   window: {
     backgroundTextStyle: 'light',
