@@ -1,6 +1,7 @@
 import { View, Text, Image, Swiper, SwiperItem } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { getRecommendedCases, analyzeUserPreference } from '@/utils/recommendation'
 import './index.scss'
 
 interface BannerItem {
@@ -31,6 +32,67 @@ export default function Index() {
     { id: 3, icon: '🔨', name: '装修施工', desc: '标准化施工管理' },
     { id: 4, icon: '📐', name: '免费量房', desc: '专业设计师上门' }
   ])
+
+  // 推荐案例
+  const [recommendedCases, setRecommendedCases] = useState<any[]>([])
+  const [hasPreference, setHasPreference] = useState(false)
+
+  // 所有案例数据
+  const allCases = [
+    {
+      id: 1,
+      title: '现代简约风格三居室',
+      style: '现代简约',
+      area: '120㎡',
+      price: '15万',
+      image: 'https://via.placeholder.com/340x240/667eea/ffffff?text=现代简约'
+    },
+    {
+      id: 2,
+      title: '北欧风格小户型',
+      style: '北欧风格',
+      area: '80㎡',
+      price: '10万',
+      image: 'https://via.placeholder.com/340x240/764ba2/ffffff?text=北欧风格'
+    },
+    {
+      id: 3,
+      title: '中式古典别墅',
+      style: '中式风格',
+      area: '300㎡',
+      price: '50万',
+      image: 'https://via.placeholder.com/340x240/52c41a/ffffff?text=中式古典'
+    },
+    {
+      id: 4,
+      title: '工业风格loft',
+      style: '工业风格',
+      area: '150㎡',
+      price: '20万',
+      image: 'https://via.placeholder.com/340x240/faad14/ffffff?text=工业风格'
+    },
+    {
+      id: 5,
+      title: '地中海风格复式',
+      style: '地中海',
+      area: '200㎡',
+      price: '30万',
+      image: 'https://via.placeholder.com/340x240/1890ff/ffffff?text=地中海'
+    }
+  ]
+
+  useEffect(() => {
+    loadRecommendations()
+  }, [])
+
+  const loadRecommendations = () => {
+    const preference = analyzeUserPreference()
+    const hasData = preference.favoriteStyles.length > 0 || preference.browseHistory.length > 0
+    setHasPreference(hasData)
+
+    const recommended = getRecommendedCases(allCases, 4)
+    setRecommendedCases(recommended)
+  }
 
   // 跳转到案例页面
   const navigateToCases = () => {
@@ -67,8 +129,23 @@ export default function Index() {
     })
   }
 
+  // 跳转到搜索页面
+  const navigateToSearch = () => {
+    Taro.navigateTo({
+      url: '/pages/search/index'
+    })
+  }
+
   return (
     <View className='index-page'>
+      {/* 搜索栏 */}
+      <View className='search-bar' onClick={navigateToSearch}>
+        <View className='search-box'>
+          <Text className='search-icon'>🔍</Text>
+          <Text className='search-placeholder'>搜索案例或设计师</Text>
+        </View>
+      </View>
+
       {/* 轮播图 */}
       <View className='banner-section'>
         <Swiper
@@ -101,6 +178,45 @@ export default function Index() {
           ))}
         </View>
       </View>
+
+      {/* 智能推荐 */}
+      {recommendedCases.length > 0 && (
+        <View className='recommendations-section'>
+          <View className='section-header'>
+            <View className='section-title-wrapper'>
+              <Text className='section-title'>
+                {hasPreference ? '✨ 为你推荐' : '🔥 热门推荐'}
+              </Text>
+              {hasPreference && (
+                <Text className='section-subtitle'>根据你的喜好精选</Text>
+              )}
+            </View>
+            <Text className='more-link' onClick={navigateToCases}>查看更多 →</Text>
+          </View>
+          <View className='cases-preview'>
+            {recommendedCases.slice(0, 2).map(caseItem => (
+              <View
+                key={caseItem.id}
+                className='case-card'
+                onClick={() => navigateToCaseDetail(caseItem.id)}
+              >
+                <Image
+                  src={caseItem.image}
+                  className='case-image'
+                  mode='aspectFill'
+                />
+                <View className='case-info'>
+                  <View className='case-title'>{caseItem.title}</View>
+                  <View className='case-tags'>
+                    <Text className='tag'>{caseItem.area}</Text>
+                    <Text className='tag'>{caseItem.price}</Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* 精品案例 */}
       <View className='cases-section'>

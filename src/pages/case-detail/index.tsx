@@ -6,6 +6,7 @@ import {
   addFavoriteCase,
   removeFavoriteCase
 } from '@/utils/favorite'
+import { addBrowseHistory } from '@/utils/recommendation'
 import './index.scss'
 
 interface CaseDetail {
@@ -94,6 +95,13 @@ function CaseDetail() {
       district: '朝阳区'
     }
     setCaseDetail(mockData)
+
+    // 添加到浏览历史
+    addBrowseHistory({
+      id: parseInt(id),
+      type: 'case',
+      style: mockData.style
+    })
   }
 
   const handleSwiperChange = (e: any) => {

@@ -23,6 +23,7 @@ export default function Mine() {
 
   const menuItems: MenuItem[] = [
     { id: 'orders', icon: '📋', title: '我的订单', subtitle: '查看装修进度' },
+    { id: 'diary', icon: '📔', title: '装修日记', subtitle: '记录装修点滴' },
     { id: 'consultations', icon: '💬', title: '我的咨询', subtitle: '查看咨询记录' },
     { id: 'appointments', icon: '📅', title: '我的预约', subtitle: '设计师预约记录' },
     { id: 'favorites', icon: '❤️', title: '我的收藏', subtitle: '收藏的案例和设计' },
@@ -88,6 +89,12 @@ export default function Mine() {
 
     // 根据不同菜单项跳转
     switch (itemId) {
+      case 'diary':
+        // 跳转到装修日记页面
+        Taro.navigateTo({
+          url: '/pages/diary/index'
+        })
+        break
       case 'consultations':
         // 跳转到我的咨询页面（用户端咨询历史）
         Taro.navigateTo({
