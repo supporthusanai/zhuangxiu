@@ -220,6 +220,44 @@ export const deleteDesigner = (id: number | string) => {
   return del(`/merchants/designers/${id}`, undefined, true);
 };
 
+// ============ 聊天相关 ============
+
+// 获取对话列表
+export const getConversations = () => {
+  return get('/chat/conversations', undefined, true);
+};
+
+// 获取对话详情
+export const getConversation = (id: string) => {
+  return get(`/chat/conversations/${id}`, undefined, true);
+};
+
+// 获取对话消息
+export const getMessages = (conversationId: string, params?: {
+  page?: number;
+  limit?: number;
+}) => {
+  return get(`/chat/conversations/${conversationId}/messages`, params, true);
+};
+
+// 创建对话
+export const createConversation = (data: {
+  participantId: string;
+  participantType: 'user' | 'merchant' | 'designer';
+}) => {
+  return post('/chat/conversations', data, true);
+};
+
+// 删除对话
+export const deleteConversation = (id: string) => {
+  return del(`/chat/conversations/${id}`, undefined, true);
+};
+
+// 获取未读消息数量
+export const getUnreadCount = () => {
+  return get('/chat/unread-count', undefined, true);
+};
+
 export default {
   // Auth
   wechatLogin,
@@ -267,4 +305,12 @@ export default {
   getMyDesigners,
   updateDesigner,
   deleteDesigner,
+
+  // Chat
+  getConversations,
+  getConversation,
+  getMessages,
+  createConversation,
+  deleteConversation,
+  getUnreadCount,
 };

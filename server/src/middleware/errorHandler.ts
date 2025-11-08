@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import logger from '../config/logger';
 
 export class AppError extends Error {
   statusCode: number;
@@ -52,10 +53,15 @@ export const errorHandler = (
     message = 'Token 已过期';
   }
 
-  // 开发环境输出详细错误
-  if (process.env.NODE_ENV === 'development') {
-    console.error('❌ 错误详情:', err);
-  }
+  // 记录错误日志
+  logger.error('请求处理错误', {
+    statusCode,
+    message,
+    url: req.originalUrl,
+    method: req.method,
+    error: err.message,
+    stack: err.stack,
+  });
 
   res.status(statusCode).json({
     success: false,
