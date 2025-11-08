@@ -1,4 +1,5 @@
 import axios from 'axios';
+import logger from '../config/logger';
 
 interface WeChatLoginResponse {
   openid?: string;
@@ -46,7 +47,7 @@ export const wechatLogin = async (code: string): Promise<WeChatLoginResponse> =>
 
     return response.data;
   } catch (error) {
-    console.error('微信登录错误:', error);
+    logger.error('微信登录错误', error);
     throw error;
   }
 };
@@ -76,7 +77,7 @@ export const getAccessToken = async (): Promise<string> => {
 
     return response.data.access_token;
   } catch (error) {
-    console.error('获取 Access Token 错误:', error);
+    logger.error('获取 Access Token 错误', error);
     throw error;
   }
 };
@@ -107,7 +108,7 @@ export const sendSubscribeMessage = async (
 
     return true;
   } catch (error) {
-    console.error('发送订阅消息错误:', error);
+    logger.error('发送订阅消息错误', error);
     return false;
   }
 };
@@ -126,7 +127,7 @@ export const getPhoneNumber = async (code: string): Promise<string | null> => {
 
     return response.data.phone_info?.phoneNumber || null;
   } catch (error) {
-    console.error('获取手机号错误:', error);
+    logger.error('获取手机号错误', error);
     return null;
   }
 };

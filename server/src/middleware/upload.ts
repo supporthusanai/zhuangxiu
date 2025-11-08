@@ -2,6 +2,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { Request } from 'express';
+import logger from '../config/logger';
 
 // 确保上传目录存在
 const uploadDir = process.env.UPLOAD_DIR || 'uploads';
@@ -92,7 +93,7 @@ export const deleteFile = (filePath: string): boolean => {
     }
     return false;
   } catch (error) {
-    console.error('删除文件失败:', error);
+    logger.error('删除文件失败', { filePath, error });
     return false;
   }
 };
