@@ -1,0 +1,308 @@
+import { Response } from 'express';
+import Case from '../models/Case';
+import BrowseHistory from '../models/BrowseHistory';
+import { AuthRequest } from '../middleware/auth';
+import { AppError } from '../middleware/errorHandler';
+import { redisClient } from '../config/database';
+
+// 获取案例列表
+export const getCases = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      style,
+      minArea,
+      maxArea,
+      minPrice,
+      maxPrice,
+      sort = 'createdAt',
+      order = 'desc',
+    } = req.query;
+
+    // 构建查询条件
+    const query: any = { status: 'published' };
+
+    if (style) query.style = style;
+    if (minArea || maxArea) {
+      query.area = {};
+      if (minArea) query.area.$gte = Number(minArea);
+      if (maxArea) query.area.$lte = Number(maxArea);
+    }
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = Number(minPrice);
+      if (maxPrice) query.price.$lte = Number(maxPrice);
+    }
+
+    // 构建排序
+    const sortOrder = order === 'asc' ? 1 : -1;
+    const sortObj: any = {};
+    sortObj[sort as string] = sortOrder;
+
+    // 分页
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // 查询
+    const [cases, total] = await Promise.all([
+      Case.find(query)
+        .populate('designer', 'name avatar title')
+        .sort(sortObj)
+        .skip(skip)
+        .limit(Number(limit)),
+      Case.countDocuments(query),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        cases,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total,
+          pages: Math.ceil(total / Number(limit)),
+        },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '获取案例列表失败',
+    });
+  }
+};
+
+// 获取案例详情
+export const getCaseById = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const caseDetail = await Case.findById(id)
+      .populate('designer', 'name avatar title experience specialties rating')
+      .populate('merchant', 'companyName logo');
+
+    if (!caseDetail) {
+      throw new AppError('案例不存在', 404);
+    }
+
+    // 增加浏览次数
+    caseDetail.viewCount += 1;
+    await caseDetail.save();
+
+    // 记录浏览历史（如果用户已登录）
+    if (req.userId) {
+      await BrowseHistory.create({
+        user: req.userId,
+        targetType: 'case',
+        targetId: id,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: caseDetail,
+    });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '获取案例详情失败',
+    });
+  }
+};
+
+// 搜索案例
+export const searchCases = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { keyword, page = 1, limit = 10 } = req.query;
+
+    if (!keyword) {
+      throw new AppError('搜索关键词不能为空', 400);
+    }
+
+    // 构建搜索查询
+    const searchQuery = {
+      status: 'published',
+      $or: [
+        { title: { $regex: keyword as string, $options: 'i' } },
+        { description: { $regex: keyword as string, $options: 'i' } },
+        { style: { $regex: keyword as string, $options: 'i' } },
+        { tags: { $regex: keyword as string, $options: 'i' } },
+      ],
+    };
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [cases, total] = await Promise.all([
+      Case.find(searchQuery)
+        .populate('designer', 'name avatar title')
+        .sort({ viewCount: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      Case.countDocuments(searchQuery),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        cases,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total,
+          pages: Math.ceil(total / Number(limit)),
+        },
+      },
+    });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '搜索案例失败',
+    });
+  }
+};
+
+// 创建案例（商家）
+export const createCase = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const caseData = {
+      ...req.body,
+      merchant: req.user.merchantId, // 从用户关联的商家获取
+    };
+
+    const newCase = await Case.create(caseData);
+
+    res.status(201).json({
+      success: true,
+      message: '创建成功',
+      data: newCase,
+    });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '创建案例失败',
+    });
+  }
+};
+
+// 更新案例（商家）
+export const updateCase = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const caseDetail = await Case.findById(id);
+
+    if (!caseDetail) {
+      throw new AppError('案例不存在', 404);
+    }
+
+    // 检查权限
+    if (caseDetail.merchant.toString() !== req.user.merchantId) {
+      throw new AppError('无权修改此案例', 403);
+    }
+
+    Object.assign(caseDetail, req.body);
+    await caseDetail.save();
+
+    res.status(200).json({
+      success: true,
+      message: '更新成功',
+      data: caseDetail,
+    });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '更新案例失败',
+    });
+  }
+};
+
+// 删除案例（商家）
+export const deleteCase = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const caseDetail = await Case.findById(id);
+
+    if (!caseDetail) {
+      throw new AppError('案例不存在', 404);
+    }
+
+    // 检查权限
+    if (caseDetail.merchant.toString() !== req.user.merchantId) {
+      throw new AppError('无权删除此案例', 403);
+    }
+
+    await caseDetail.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: '删除成功',
+    });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '删除案例失败',
+    });
+  }
+};
+
+// 获取热门案例（带缓存）
+export const getHotCases = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const limit = Number(req.query.limit) || 10;
+    const cacheKey = `hot_cases:${limit}`;
+
+    // 尝试从 Redis 获取缓存
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      res.status(200).json({
+        success: true,
+        data: JSON.parse(cached),
+        fromCache: true,
+      });
+      return;
+    }
+
+    // 从数据库查询
+    const cases = await Case.find({ status: 'published' })
+      .populate('designer', 'name avatar title')
+      .sort({ viewCount: -1, favoriteCount: -1 })
+      .limit(limit);
+
+    // 缓存结果（5分钟）
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(cases));
+
+    res.status(200).json({
+      success: true,
+      data: cases,
+      fromCache: false,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '获取热门案例失败',
+    });
+  }
+};
