@@ -5,6 +5,8 @@ import User from '../models/User';
 export interface AuthRequest extends Request {
   user?: any;
   userId?: string;
+  file?: Express.Multer.File;
+  files?: Express.Multer.File[];
 }
 
 // JWT 认证中间件
