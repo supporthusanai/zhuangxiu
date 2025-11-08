@@ -1,0 +1,114 @@
+.profile-edit-page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding: 20rpx;
+}
+
+/* 编辑项 */
+.edit-item {
+  background: #fff;
+  padding: 32rpx 30rpx;
+  margin-bottom: 20rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.signature-item {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.item-label {
+  font-size: 30rpx;
+  color: #333;
+  font-weight: 600;
+}
+
+.item-value {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.avatar-image {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50rpx;
+  border: 2rpx solid #f0f0f0;
+}
+
+.arrow {
+  font-size: 40rpx;
+  color: #ddd;
+}
+
+.input-field {
+  flex: 1;
+  text-align: right;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.value-text {
+  font-size: 28rpx;
+  color: #666;
+}
+
+/* 个性签名 */
+.signature-input-wrap {
+  width: 100%;
+  margin-top: 20rpx;
+  position: relative;
+}
+
+.signature-input {
+  width: 100%;
+  min-height: 120rpx;
+  padding: 20rpx;
+  background: #f5f5f5;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  color: #333;
+  line-height: 1.6;
+}
+
+.char-count {
+  position: absolute;
+  bottom: 12rpx;
+  right: 20rpx;
+  font-size: 22rpx;
+  color: #999;
+}
+
+/* 保存按钮 */
+.save-btn {
+  margin: 60rpx 0 20rpx;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 44rpx;
+  box-shadow: 0 8rpx 24rpx rgba(102, 126, 234, 0.3);
+
+  &:active {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+}
+
+/* 提示 */
+.tips {
+  text-align: center;
+  padding: 20rpx;
+}
+
+.tips-text {
+  font-size: 24rpx;
+  color: #999;
+}

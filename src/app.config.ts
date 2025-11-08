@@ -7,6 +7,7 @@ export default defineAppConfig({
     'pages/case-detail/index',
     'pages/designer-detail/index',
     'pages/login/index',
+    'pages/profile-edit/index',
     'pages/merchant-apply/index',
     'pages/merchant-center/index',
     'pages/merchant-cases/index',

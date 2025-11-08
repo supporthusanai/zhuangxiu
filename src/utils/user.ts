@@ -5,6 +5,9 @@ export interface UserInfo {
   nickname: string
   avatar: string
   phone?: string
+  gender?: 'male' | 'female' | 'unknown'
+  region?: string
+  signature?: string
   isLogin: boolean
 }
 

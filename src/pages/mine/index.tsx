@@ -58,6 +58,16 @@ export default function Mine() {
     })
   }
 
+  const handleEditProfile = () => {
+    if (!userInfo?.isLogin) {
+      handleLogin()
+      return
+    }
+    Taro.navigateTo({
+      url: '/pages/profile-edit/index'
+    })
+  }
+
   const handleMenuItem = (itemId: string) => {
     // 部分功能需要登录
     const needLoginItems = ['orders', 'consultations', 'appointments', 'favorites']
@@ -169,21 +179,21 @@ export default function Mine() {
     <View className='mine-page'>
       {/* 用户信息区域 */}
       <View className='user-section'>
-        <View className='user-info'>
+        <View className='user-info' onClick={!userInfo?.isLogin ? handleLogin : handleEditProfile}>
           <Image
             src={userInfo?.avatar || 'https://via.placeholder.com/140x140/667eea/ffffff?text=头像'}
             className='user-avatar'
             mode='aspectFill'
-            onClick={!userInfo?.isLogin ? handleLogin : undefined}
           />
           <View className='user-details'>
-            <View className='user-name' onClick={!userInfo?.isLogin ? handleLogin : undefined}>
+            <View className='user-name'>
               {userInfo?.isLogin ? userInfo.nickname : '点击登录'}
             </View>
             <View className='user-desc'>
-              {userInfo?.isLogin ? (userInfo.phone || '已登录') : '登录后享受更多服务'}
+              {userInfo?.isLogin ? (userInfo.signature || userInfo.phone || '点击编辑资料') : '登录后享受更多服务'}
             </View>
           </View>
+          {userInfo?.isLogin && <View className='edit-icon'>✏️</View>}
         </View>
         <View className='setting-icon' onClick={handleSetting}>
           ⚙️

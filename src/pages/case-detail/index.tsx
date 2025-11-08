@@ -31,10 +31,19 @@ interface CaseDetail {
   district: string
 }
 
-export default function CaseDetail() {
+function CaseDetail() {
   const [caseDetail, setCaseDetail] = useState<CaseDetail | null>(null)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [isFavorite, setIsFavorite] = useState(false)
+
+  // 启用分享功能
+  Taro.useShareAppMessage(() => {
+    return {
+      title: caseDetail?.title || '装修案例分享',
+      path: `/pages/case-detail/index?id=${caseDetail?.id}`,
+      imageUrl: caseDetail?.images[0] || ''
+    }
+  })
 
   useEffect(() => {
     // 获取路由参数
@@ -140,11 +149,23 @@ export default function CaseDetail() {
     })
   }
 
+  const handleImagePreview = () => {
+    if (!caseDetail) return
+    Taro.previewImage({
+      current: caseDetail.images[currentImageIndex], // 当前显示图片
+      urls: caseDetail.images // 所有图片列表
+    })
+  }
+
   const handleShare = () => {
+    Taro.showShareMenu({
+      withShareTicket: true,
+      showShareItems: ['wechatFriends', 'wechatMoment']
+    })
     Taro.showToast({
-      title: '分享功能待实现',
+      title: '点击右上角分享',
       icon: 'none',
-      duration: 1500
+      duration: 2000
     })
   }
 
@@ -175,7 +196,7 @@ export default function CaseDetail() {
           onChange={handleSwiperChange}
         >
           {caseDetail.images.map((image, index) => (
-            <SwiperItem key={index}>
+            <SwiperItem key={index} onClick={handleImagePreview}>
               <Image src={image} className='case-image' mode='aspectFill' />
             </SwiperItem>
           ))}
@@ -253,3 +274,5 @@ export default function CaseDetail() {
     </ScrollView>
   )
 }
+
+export default CaseDetail
