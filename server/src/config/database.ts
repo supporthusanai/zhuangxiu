@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { createClient } from 'redis';
+import logger from './logger';
 
 // MongoDB 连接
 export const connectMongoDB = async (): Promise<void> => {
@@ -8,17 +9,17 @@ export const connectMongoDB = async (): Promise<void> => {
 
     await mongoose.connect(mongoUri);
 
-    console.log('✅ MongoDB 连接成功');
+    logger.info('✅ MongoDB 连接成功');
 
     mongoose.connection.on('error', (error) => {
-      console.error('❌ MongoDB 连接错误:', error);
+      logger.error('❌ MongoDB 连接错误', error);
     });
 
     mongoose.connection.on('disconnected', () => {
-      console.warn('⚠️  MongoDB 连接断开');
+      logger.warn('⚠️  MongoDB 连接断开');
     });
   } catch (error) {
-    console.error('❌ MongoDB 连接失败:', error);
+    logger.error('❌ MongoDB 连接失败', error);
     process.exit(1);
   }
 };
@@ -35,17 +36,17 @@ export const redisClient = createClient({
 export const connectRedis = async (): Promise<void> => {
   try {
     await redisClient.connect();
-    console.log('✅ Redis 连接成功');
+    logger.info('✅ Redis 连接成功');
 
     redisClient.on('error', (error) => {
-      console.error('❌ Redis 连接错误:', error);
+      logger.error('❌ Redis 连接错误', error);
     });
 
     redisClient.on('disconnect', () => {
-      console.warn('⚠️  Redis 连接断开');
+      logger.warn('⚠️  Redis 连接断开');
     });
   } catch (error) {
-    console.error('❌ Redis 连接失败:', error);
+    logger.error('❌ Redis 连接失败', error);
     process.exit(1);
   }
 };
@@ -55,8 +56,8 @@ export const closeDatabases = async (): Promise<void> => {
   try {
     await mongoose.connection.close();
     await redisClient.quit();
-    console.log('✅ 数据库连接已关闭');
+    logger.info('✅ 数据库连接已关闭');
   } catch (error) {
-    console.error('❌ 关闭数据库连接失败:', error);
+    logger.error('❌ 关闭数据库连接失败', error);
   }
 };
