@@ -4,6 +4,8 @@ import caseRoutes from './caseRoutes';
 import diaryRoutes from './diaryRoutes';
 import favoriteRoutes from './favoriteRoutes';
 import recommendRoutes from './recommendRoutes';
+import uploadRoutes from './uploadRoutes';
+import merchantRoutes from './merchantRoutes';
 
 const router = Router();
 
@@ -13,6 +15,8 @@ router.use('/cases', caseRoutes);
 router.use('/diaries', diaryRoutes);
 router.use('/favorites', favoriteRoutes);
 router.use('/recommend', recommendRoutes);
+router.use('/upload', uploadRoutes);
+router.use('/merchants', merchantRoutes);
 
 // 健康检查
 router.get('/health', (req, res) => {

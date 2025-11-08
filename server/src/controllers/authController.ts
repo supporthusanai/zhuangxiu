@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { wechatLogin as wechatLoginApi, getPhoneNumber } from '../utils/wechat';
 
 // 生成 JWT Token
 const generateToken = (userId: string): string => {
@@ -23,9 +24,14 @@ export const wechatLogin = async (
       throw new AppError('code 不能为空', 400);
     }
 
-    // TODO: 调用微信 API 获取 openid 和 session_key
-    // 这里使用模拟数据
-    const openid = `mock_openid_${Date.now()}`;
+    // 调用微信 API 获取 openid 和 session_key
+    const wechatResult = await wechatLoginApi(code);
+
+    if (!wechatResult.openid) {
+      throw new AppError('微信登录失败', 400);
+    }
+
+    const openid = wechatResult.openid;
 
     // 查找或创建用户
     let user = await User.findOne({ openid });
@@ -198,6 +204,50 @@ export const updateProfile = async (
     res.status(error instanceof AppError ? error.statusCode : 500).json({
       success: false,
       message: error instanceof Error ? error.message : '更新用户信息失败',
+    });
+  }
+};
+
+// 获取微信手机号
+export const getWechatPhone = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { code } = req.body;
+
+    if (!code) {
+      throw new AppError('code 不能为空', 400);
+    }
+
+    // 调用微信 API 获取手机号
+    const phoneNumber = await getPhoneNumber(code);
+
+    if (!phoneNumber) {
+      throw new AppError('获取手机号失败', 400);
+    }
+
+    // 更新用户手机号
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      throw new AppError('用户不存在', 404);
+    }
+
+    user.phone = phoneNumber;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: '获取手机号成功',
+      data: {
+        phone: phoneNumber,
+      },
+    });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '获取手机号失败',
     });
   }
 };

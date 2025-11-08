@@ -4,6 +4,7 @@ import {
   phoneLogin,
   getCurrentUser,
   updateProfile,
+  getWechatPhone,
 } from '../controllers/authController';
 import { authenticate } from '../middleware/auth';
 
@@ -20,5 +21,8 @@ router.get('/me', authenticate, getCurrentUser);
 
 // 更新用户资料（需要认证）
 router.put('/profile', authenticate, updateProfile);
+
+// 获取微信手机号（需要认证）
+router.post('/wechat-phone', authenticate, getWechatPhone);
 
 export default router;
