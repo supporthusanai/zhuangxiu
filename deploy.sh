@@ -111,6 +111,89 @@ check_command() {
     return 0
 }
 
+# 检查并切换 Node.js 版本
+check_node_version() {
+    local required_major=20
+    local current_version=$(node -v 2>/dev/null | sed 's/v//')
+    local current_major=$(echo "$current_version" | cut -d. -f1)
+
+    if [ -z "$current_version" ]; then
+        log_error "Node.js 未安装"
+        return 1
+    fi
+
+    if [ "$current_major" -ge "$required_major" ]; then
+        log_info "Node.js 版本: v${current_version} ✓"
+        return 0
+    fi
+
+    log_warn "Node.js 版本过低: v${current_version} (需要 >= ${required_major})"
+
+    # 检查 nvm 是否可用
+    if [ -f "$HOME/.nvm/nvm.sh" ]; then
+        log_info "检测到 nvm，尝试切换版本..."
+
+        # 加载 nvm
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+        # 检查是否有 Node 20+
+        local available_version=$(nvm ls --no-colors 2>/dev/null | grep -oE 'v(2[0-9]|[3-9][0-9])\.[0-9]+\.[0-9]+' | head -1)
+
+        if [ -n "$available_version" ]; then
+            log_info "切换到 ${available_version}..."
+            nvm use "${available_version}" > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+                log_info "已切换到 Node.js ${available_version} ✓"
+                return 0
+            fi
+        fi
+
+        # 没有合适版本，尝试安装
+        log_info "安装 Node.js ${required_major}..."
+        nvm install ${required_major} > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            nvm use ${required_major} > /dev/null 2>&1
+            log_info "已安装并切换到 Node.js ${required_major} ✓"
+            return 0
+        fi
+    fi
+
+    # 检查 fnm
+    if command -v fnm &> /dev/null; then
+        log_info "检测到 fnm，尝试切换版本..."
+        eval "$(fnm env)" 2>/dev/null
+
+        if fnm use ${required_major} > /dev/null 2>&1; then
+            log_info "已切换到 Node.js ${required_major} ✓"
+            return 0
+        fi
+
+        log_info "安装 Node.js ${required_major}..."
+        if fnm install ${required_major} > /dev/null 2>&1; then
+            fnm use ${required_major} > /dev/null 2>&1
+            log_info "已安装并切换到 Node.js ${required_major} ✓"
+            return 0
+        fi
+    fi
+
+    # 检查 n
+    if command -v n &> /dev/null; then
+        log_info "检测到 n，尝试切换版本..."
+        if sudo n ${required_major} > /dev/null 2>&1; then
+            log_info "已切换到 Node.js ${required_major} ✓"
+            return 0
+        fi
+    fi
+
+    log_warn "无法自动切换 Node.js 版本，请手动升级到 v${required_major}+"
+    log_warn "推荐使用 nvm: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash"
+    log_warn "然后运行: nvm install ${required_major} && nvm use ${required_major}"
+
+    # 不阻止执行，只是警告
+    return 0
+}
+
 #===============================================================================
 # 环境检查
 #===============================================================================
@@ -237,6 +320,10 @@ install_deps() {
 
 start_dev_all() {
     log_step "启动全部开发服务..."
+
+    # 检查 Node.js 版本
+    check_node_version
+
     check_services
     mkdir -p "${LOG_DIR}"
 
@@ -320,6 +407,9 @@ start_dev_miniapp() {
 }
 
 start_dev_h5() {
+    # H5 需要 Node.js 20+
+    check_node_version
+
     mkdir -p "${LOG_DIR}"
     install_deps "${MINIAPP_DIR}" "H5前端"
 
