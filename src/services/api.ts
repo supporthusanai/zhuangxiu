@@ -220,6 +220,92 @@ export const deleteDesigner = (id: number | string) => {
   return del(`/merchants/designers/${id}`, undefined, true);
 };
 
+// ============ 订单相关 ============
+
+// 创建订单
+export const createOrder = (data: {
+  merchant: string;
+  designer?: string;
+  case?: string;
+  projectName: string;
+  projectAddress: string;
+  projectArea: number;
+  projectStyle: string;
+  projectRooms: string;
+  items: Array<{
+    name: string;
+    description?: string;
+    quantity: number;
+    unit: string;
+    unitPrice: number;
+    totalPrice: number;
+  }>;
+  discount?: number;
+  expectedStartDate?: string;
+  customerNote?: string;
+  contactName: string;
+  contactPhone: string;
+}) => {
+  return post('/orders', data, true);
+};
+
+// 获取我的订单
+export const getMyOrders = (params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+}) => {
+  return get('/orders/my', params, true);
+};
+
+// 获取订单详情
+export const getOrderDetail = (id: string) => {
+  return get(`/orders/${id}`, undefined, true);
+};
+
+// 取消订单
+export const cancelOrder = (id: string, reason?: string) => {
+  return post(`/orders/${id}/cancel`, { reason }, true);
+};
+
+// 商家：获取订单列表
+export const getMerchantOrders = (params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  paymentStatus?: string;
+}) => {
+  return get('/orders/merchant/list', params, true);
+};
+
+// 商家：更新订单状态
+export const updateOrderStatus = (id: string, data: {
+  status: string;
+  merchantNote?: string;
+}) => {
+  return put(`/orders/${id}/status`, data, true);
+};
+
+// 商家：添加支付记录
+export const addPaymentRecord = (id: string, data: {
+  amount: number;
+  method: 'wechat' | 'alipay' | 'bank' | 'cash';
+  transactionId?: string;
+  note?: string;
+}) => {
+  return post(`/orders/${id}/payment`, data, true);
+};
+
+// 商家：获取订单统计
+export const getOrderStats = () => {
+  return get('/orders/merchant/stats', undefined, true);
+};
+
+// 发送短信验证码
+export const sendSmsCode = (phone: string) => {
+  return post('/auth/send-code', { phone });
+};
+
 // ============ 聊天相关 ============
 
 // 获取对话列表

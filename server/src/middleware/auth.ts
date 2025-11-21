@@ -80,6 +80,64 @@ export const checkRole = (...roles: string[]) => {
   };
 };
 
+// 商家认证中间件
+export const requireMerchant = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      message: '未认证',
+    });
+    return;
+  }
+
+  if (req.user.role !== 'merchant' && req.user.role !== 'admin') {
+    res.status(403).json({
+      success: false,
+      message: '需要商家权限',
+    });
+    return;
+  }
+
+  if (!req.user.merchantId && req.user.role !== 'admin') {
+    res.status(403).json({
+      success: false,
+      message: '商家信息未绑定',
+    });
+    return;
+  }
+
+  next();
+};
+
+// 管理员认证中间件
+export const requireAdmin = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      message: '未认证',
+    });
+    return;
+  }
+
+  if (req.user.role !== 'admin') {
+    res.status(403).json({
+      success: false,
+      message: '需要管理员权限',
+    });
+    return;
+  }
+
+  next();
+};
+
 // 可选认证中间件（用于公开但可增强的接口）
 export const optionalAuth = async (
   req: AuthRequest,
