@@ -96,7 +96,7 @@ const startServer = async (): Promise<void> => {
 ║   端口：${PORT}
 ║   时间：${new Date().toLocaleString('zh-CN')}
 ║   Socket.io: ✅ 已启用
-║   API 文档: http://localhost:${PORT}/api-docs
+║   API 文档: http://${process.env.HOST || 'localhost'}:${PORT}/api-docs
 ║                                            ║
 ╚════════════════════════════════════════════╝
       `);

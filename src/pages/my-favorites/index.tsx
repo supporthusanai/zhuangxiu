@@ -1,65 +1,119 @@
 import { View, Text, Image } from '@tarojs/components'
-import Taro from '@tarojs/taro'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { useState, useEffect } from 'react'
-import {
-  getFavoriteCases,
-  getFavoriteDesigners,
-  removeFavoriteCase,
-  removeFavoriteDesigner,
-  type FavoriteCase,
-  type FavoriteDesigner
-} from '@/utils/favorite'
+import { getMyFavorites, removeFavorite } from '@/services/api'
 import './index.scss'
 
 type TabType = 'cases' | 'designers'
+
+interface FavoriteCase {
+  id: string
+  title: string
+  image: string
+  style: string
+  area: string
+  price: string
+  favoriteTime: number
+}
+
+interface FavoriteDesigner {
+  id: string
+  name: string
+  avatar: string
+  title: string
+  experience: string
+  caseCount: number
+  rating: number
+  favoriteTime: number
+}
 
 export default function MyFavorites() {
   const [activeTab, setActiveTab] = useState<TabType>('cases')
   const [favoriteCases, setFavoriteCases] = useState<FavoriteCase[]>([])
   const [favoriteDesigners, setFavoriteDesigners] = useState<FavoriteDesigner[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadFavorites()
   }, [])
 
-  // 页面显示时重新加载
-  useEffect(() => {
-    Taro.useDidShow(() => {
-      loadFavorites()
-    })
-  }, [])
+  useDidShow(() => {
+    loadFavorites()
+  })
 
-  const loadFavorites = () => {
-    setFavoriteCases(getFavoriteCases())
-    setFavoriteDesigners(getFavoriteDesigners())
+  const loadFavorites = async () => {
+    try {
+      setLoading(true)
+      const [casesRes, designersRes] = await Promise.all([
+        getMyFavorites({ targetType: 'case' }),
+        getMyFavorites({ targetType: 'designer' })
+      ])
+
+      if (casesRes.success && casesRes.data) {
+        setFavoriteCases(casesRes.data.favorites?.map((item: any) => ({
+          id: item.target?._id || item.targetId,
+          title: item.target?.title || '',
+          image: item.target?.images?.[0] || '',
+          style: item.target?.style || '',
+          area: item.target?.area ? `${item.target.area}㎡` : '',
+          price: item.target?.price ? `${item.target.price}万` : '',
+          favoriteTime: new Date(item.createdAt).getTime()
+        })) || [])
+      }
+
+      if (designersRes.success && designersRes.data) {
+        setFavoriteDesigners(designersRes.data.favorites?.map((item: any) => ({
+          id: item.target?._id || item.targetId,
+          name: item.target?.companyName || item.target?.name || '',
+          avatar: item.target?.logo || item.target?.avatar || '',
+          title: item.target?.description || '',
+          experience: item.target?.experience ? `${item.target.experience}年经验` : '',
+          caseCount: item.target?.caseCount || 0,
+          rating: item.target?.rating || 0,
+          favoriteTime: new Date(item.createdAt).getTime()
+        })) || [])
+      }
+    } catch (error) {
+      console.error('加载收藏列表失败:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleCaseDetail = (caseId: number) => {
+  const handleCaseDetail = (caseId: string) => {
     Taro.navigateTo({
       url: `/pages/case-detail/index?id=${caseId}`
     })
   }
 
-  const handleDesignerDetail = (designerId: number) => {
+  const handleDesignerDetail = (designerId: string) => {
     Taro.navigateTo({
       url: `/pages/designer-detail/index?id=${designerId}`
     })
   }
 
-  const handleRemoveCase = (caseId: number, e: any) => {
+  const handleRemoveCase = async (caseId: string, e: any) => {
     e.stopPropagation()
     Taro.showModal({
       title: '提示',
       content: '确认取消收藏该案例吗？',
       confirmColor: '#ff4d4f',
-      success: (res) => {
+      success: async (res) => {
         if (res.confirm) {
-          const success = removeFavoriteCase(caseId)
-          if (success) {
-            setFavoriteCases(favoriteCases.filter(item => item.id !== caseId))
+          try {
+            const result = await removeFavorite('case', caseId)
+            if (result.success) {
+              setFavoriteCases(favoriteCases.filter(item => item.id !== caseId))
+              Taro.showToast({
+                title: '已取消收藏',
+                icon: 'success',
+                duration: 1500
+              })
+            }
+          } catch (error) {
             Taro.showToast({
-              title: '已取消收藏',
-              icon: 'success',
+              title: '操作失败',
+              icon: 'error',
               duration: 1500
             })
           }
@@ -68,20 +122,28 @@ export default function MyFavorites() {
     })
   }
 
-  const handleRemoveDesigner = (designerId: number, e: any) => {
+  const handleRemoveDesigner = async (designerId: string, e: any) => {
     e.stopPropagation()
     Taro.showModal({
       title: '提示',
       content: '确认取消收藏该设计师吗？',
       confirmColor: '#ff4d4f',
-      success: (res) => {
+      success: async (res) => {
         if (res.confirm) {
-          const success = removeFavoriteDesigner(designerId)
-          if (success) {
-            setFavoriteDesigners(favoriteDesigners.filter(item => item.id !== designerId))
+          try {
+            const result = await removeFavorite('designer', designerId)
+            if (result.success) {
+              setFavoriteDesigners(favoriteDesigners.filter(item => item.id !== designerId))
+              Taro.showToast({
+                title: '已取消收藏',
+                icon: 'success',
+                duration: 1500
+              })
+            }
+          } catch (error) {
             Taro.showToast({
-              title: '已取消收藏',
-              icon: 'success',
+              title: '操作失败',
+              icon: 'error',
               duration: 1500
             })
           }
@@ -105,6 +167,16 @@ export default function MyFavorites() {
     } else {
       return `${date.getMonth() + 1}月${date.getDate()}日`
     }
+  }
+
+  if (loading) {
+    return (
+      <View className='my-favorites-page'>
+        <View className='loading-state'>
+          <Text>加载中...</Text>
+        </View>
+      </View>
+    )
   }
 
   return (
