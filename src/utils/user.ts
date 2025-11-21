@@ -127,7 +127,7 @@ export const getWechatUserProfile = async (): Promise<any> => {
 export const wechatLoginComplete = async (): Promise<UserInfo> => {
   try {
     // 1. 获取 code
-    const { code } = await wechatLogin()
+    const { code: _code } = await wechatLogin()
 
     // 2. 获取用户信息
     const wxUserInfo = await getWechatUserProfile()

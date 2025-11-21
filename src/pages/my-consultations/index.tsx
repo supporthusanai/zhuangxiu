@@ -63,6 +63,7 @@ export default function MyConsultations() {
     })
   }
 
+  /* TODO: Implement delete functionality when backend is ready
   const handleDelete = (consultationId: string, e: any) => {
     e.stopPropagation()
     Taro.showModal({
@@ -71,16 +72,17 @@ export default function MyConsultations() {
       confirmColor: '#ff4d4f',
       success: (res) => {
         if (res.confirm) {
+          // Call API to delete consultation with consultationId
           Taro.showToast({
             title: '删除成功',
             icon: 'success',
             duration: 1500
           })
-          // 实际应该调用接口删除
         }
       }
     })
   }
+  */
 
   const totalUnread = consultations.reduce((sum, item) => sum + item.unreadCount, 0)
 

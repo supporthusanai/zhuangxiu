@@ -34,7 +34,7 @@ export default function CaseEdit() {
     }
   }, [])
 
-  const loadCaseData = (id: string) => {
+  const loadCaseData = (_id: string) => {
     // 模拟加载数据
     setFormData({
       title: '现代简约 · 三居室',
