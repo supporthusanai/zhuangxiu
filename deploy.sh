@@ -208,11 +208,30 @@ install_deps() {
     local dir=$1
     local name=$2
     cd "$dir"
-    if [ ! -d "node_modules" ] || [ ! -f "node_modules/.package-lock.json" ]; then
+
+    local need_install=false
+
+    # 检查 node_modules 是否存在
+    if [ ! -d "node_modules" ]; then
+        log_info "${name}: node_modules 不存在，需要安装"
+        need_install=true
+    # 检查 package.json 是否比 node_modules 更新（依赖有变更）
+    elif [ "package.json" -nt "node_modules" ]; then
+        log_info "${name}: package.json 已更新，重新安装依赖"
+        need_install=true
+    # 检查 package-lock.json 是否比 node_modules 更新
+    elif [ -f "package-lock.json" ] && [ "package-lock.json" -nt "node_modules" ]; then
+        log_info "${name}: package-lock.json 已更新，重新安装依赖"
+        need_install=true
+    fi
+
+    if [ "$need_install" = true ]; then
         log_info "安装${name}依赖..."
         npm install
+        # 更新 node_modules 时间戳
+        touch node_modules
     else
-        log_info "${name}依赖已安装 ✓"
+        log_info "${name}依赖已是最新 ✓"
     fi
 }
 
