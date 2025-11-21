@@ -6,6 +6,10 @@ import {
   FileImageOutlined,
   OrderedListOutlined,
   LogoutOutlined,
+  StarOutlined,
+  CalendarOutlined,
+  TeamOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { MenuProps } from 'antd';
@@ -29,6 +33,10 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     { key: '/merchants', icon: <ShopOutlined />, label: '商家管理' },
     { key: '/cases', icon: <FileImageOutlined />, label: '案例管理' },
     { key: '/orders', icon: <OrderedListOutlined />, label: '订单管理' },
+    { key: '/reviews', icon: <StarOutlined />, label: '评价管理' },
+    { key: '/appointments', icon: <CalendarOutlined />, label: '预约管理' },
+    { key: '/designers', icon: <TeamOutlined />, label: '设计师管理' },
+    { key: '/statistics', icon: <BarChartOutlined />, label: '数据统计' },
   ];
 
   const userMenuItems: MenuProps['items'] = [

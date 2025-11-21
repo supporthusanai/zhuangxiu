@@ -3,6 +3,9 @@ import User from '../models/User';
 import Merchant from '../models/Merchant';
 import Case from '../models/Case';
 import Order from '../models/Order';
+import Review from '../models/Review';
+import Appointment from '../models/Appointment';
+import Designer from '../models/Designer';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { escapeRegex, validatePagination } from '../utils/sanitize';
@@ -206,5 +209,189 @@ export const updateCaseStatus = async (
     res.status(200).json({ success: true, message: '状态更新成功', data: caseItem });
   } catch (error) {
     res.status(error instanceof AppError ? error.statusCode : 500).json({ success: false, message: error instanceof Error ? error.message : '更新失败' });
+  }
+};
+
+// 获取所有评价
+export const getAllReviews = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { rating, search } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
+
+    const query: any = {};
+    if (rating) query.rating = Number(rating);
+    if (search) {
+      const escapedSearch = escapeRegex(search as string);
+      query.content = { $regex: escapedSearch, $options: 'i' };
+    }
+
+    const [reviews, total] = await Promise.all([
+      Review.find(query)
+        .populate('user', 'nickname avatar')
+        .populate('merchant', 'companyName')
+        .populate('order', 'orderNo')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Review.countDocuments(query),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: { reviews, pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) } },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error instanceof Error ? error.message : '获取评价列表失败' });
+  }
+};
+
+// 删除评价
+export const deleteReview = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const review = await Review.findByIdAndDelete(id);
+    if (!review) throw new AppError('评价不存在', 404);
+
+    res.status(200).json({ success: true, message: '删除成功' });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({ success: false, message: error instanceof Error ? error.message : '删除失败' });
+  }
+};
+
+// 获取所有预约
+export const getAllAppointments = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { status, search } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
+
+    const query: any = {};
+    if (status) query.status = status;
+
+    const [appointments, total] = await Promise.all([
+      Appointment.find(query)
+        .populate('user', 'nickname phone')
+        .populate('merchant', 'companyName')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Appointment.countDocuments(query),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: { appointments, pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) } },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error instanceof Error ? error.message : '获取预约列表失败' });
+  }
+};
+
+// 获取所有设计师
+export const getAllDesigners = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { search } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
+
+    const query: any = {};
+    if (search) {
+      const escapedSearch = escapeRegex(search as string);
+      query.$or = [
+        { name: { $regex: escapedSearch, $options: 'i' } },
+        { title: { $regex: escapedSearch, $options: 'i' } },
+      ];
+    }
+
+    const [designers, total] = await Promise.all([
+      Designer.find(query)
+        .populate('merchant', 'companyName')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Designer.countDocuments(query),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: { designers, pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) } },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error instanceof Error ? error.message : '获取设计师列表失败' });
+  }
+};
+
+// 删除设计师
+export const deleteDesigner = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const designer = await Designer.findByIdAndDelete(id);
+    if (!designer) throw new AppError('设计师不存在', 404);
+
+    res.status(200).json({ success: true, message: '删除成功' });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({ success: false, message: error instanceof Error ? error.message : '删除失败' });
+  }
+};
+
+// 获取详细统计数据
+export const getDetailedStats = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    // 获取最近7天的数据趋势
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const [
+      totalUsers,
+      totalMerchants,
+      totalCases,
+      totalOrders,
+      totalReviews,
+      totalAppointments,
+      totalDesigners,
+      recentUsers,
+      recentOrders,
+      usersByRole,
+      ordersByStatus,
+    ] = await Promise.all([
+      User.countDocuments(),
+      Merchant.countDocuments({ status: 'approved' }),
+      Case.countDocuments({ status: 'published' }),
+      Order.countDocuments(),
+      Review.countDocuments(),
+      Appointment.countDocuments(),
+      Designer.countDocuments(),
+      User.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+      Order.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+      User.aggregate([{ $group: { _id: '$role', count: { $sum: 1 } } }]),
+      Order.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        overview: { totalUsers, totalMerchants, totalCases, totalOrders, totalReviews, totalAppointments, totalDesigners },
+        recent: { recentUsers, recentOrders },
+        distribution: { usersByRole, ordersByStatus },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error instanceof Error ? error.message : '获取统计数据失败' });
   }
 };

@@ -7,6 +7,12 @@ import {
   getAllOrders,
   getDashboardStats,
   updateCaseStatus,
+  getAllReviews,
+  deleteReview,
+  getAllAppointments,
+  getAllDesigners,
+  deleteDesigner,
+  getDetailedStats,
 } from '../controllers/adminController';
 import { authenticate, requireAdmin } from '../middleware/auth';
 
@@ -17,6 +23,7 @@ router.use(authenticate, requireAdmin);
 
 // 仪表盘
 router.get('/stats/dashboard', getDashboardStats);
+router.get('/stats/detailed', getDetailedStats);
 
 // 用户管理
 router.get('/users', getUsers);
@@ -31,5 +38,16 @@ router.get('/orders', getAllOrders);
 
 // 案例管理
 router.put('/cases/:id/status', updateCaseStatus);
+
+// 评价管理
+router.get('/reviews', getAllReviews);
+router.delete('/reviews/:id', deleteReview);
+
+// 预约管理
+router.get('/appointments', getAllAppointments);
+
+// 设计师管理
+router.get('/designers', getAllDesigners);
+router.delete('/designers/:id', deleteDesigner);
 
 export default router;

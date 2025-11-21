@@ -7,6 +7,10 @@ import Users from './pages/Users';
 import Merchants from './pages/Merchants';
 import Cases from './pages/Cases';
 import Orders from './pages/Orders';
+import Reviews from './pages/Reviews';
+import Appointments from './pages/Appointments';
+import Designers from './pages/Designers';
+import Statistics from './pages/Statistics';
 import { getCurrentUser } from './services/api';
 
 function App() {
@@ -57,6 +61,10 @@ function App() {
           <Route path="/merchants" element={<Merchants />} />
           <Route path="/cases" element={<Cases />} />
           <Route path="/orders" element={<Orders />} />
+          <Route path="/reviews" element={<Reviews />} />
+          <Route path="/appointments" element={<Appointments />} />
+          <Route path="/designers" element={<Designers />} />
+          <Route path="/statistics" element={<Statistics />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

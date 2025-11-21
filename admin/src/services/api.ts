@@ -62,7 +62,19 @@ export const getOrderDetail = (id: string) => api.get(`/orders/${id}`);
 
 // 统计数据
 export const getDashboardStats = () => api.get('/admin/stats/dashboard');
+export const getDetailedStats = () => api.get('/admin/stats/detailed');
 export const getOrderStats = () => api.get('/admin/stats/orders');
 export const getUserStats = () => api.get('/admin/stats/users');
+
+// 评价管理
+export const getReviews = (params?: any) => api.get('/admin/reviews', { params });
+export const deleteReview = (id: string) => api.delete(`/admin/reviews/${id}`);
+
+// 预约管理
+export const getAppointments = (params?: any) => api.get('/admin/appointments', { params });
+
+// 设计师管理
+export const getDesigners = (params?: any) => api.get('/admin/designers', { params });
+export const deleteDesigner = (id: string) => api.delete(`/admin/designers/${id}`);
 
 export default api;
