@@ -242,7 +242,7 @@ start_dev_admin() {
     npm run dev > "${LOG_DIR}/admin-dev.log" 2>&1 &
     echo $! > "${LOG_DIR}/admin-dev.pid"
     sleep 2
-    log_info "管理后台已启动: http://localhost:5173"
+    log_info "管理后台已启动: http://localhost:3001"
 }
 
 start_dev_miniapp() {
@@ -292,7 +292,7 @@ print_dev_urls() {
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
     echo -e "${GREEN}  服务地址:${NC}"
     echo -e "    后端 API:     http://localhost:${API_PORT}"
-    echo -e "    管理后台:     http://localhost:5173"
+    echo -e "    管理后台:     http://localhost:3001"
     echo -e "    H5 前端:      http://localhost:10086 (如已启动)"
     echo -e "    小程序:       使用微信开发者工具打开 dist 目录"
     echo ""
