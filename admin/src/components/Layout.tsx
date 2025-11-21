@@ -45,7 +45,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           mode="inline"
           selectedKeys={[location.pathname]}
           items={menuItems}
-          onClick={({ key }) => navigate(key)}
+          onClick={({ key }: { key: string }) => navigate(key)}
           style={{ borderRight: 0 }}
         />
       </Sider>

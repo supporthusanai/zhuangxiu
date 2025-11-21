@@ -30,7 +30,7 @@ const mockRecentOrders = [
 ];
 
 const Dashboard: React.FC = () => {
-  const [stats, setStats] = useState(mockStats);
+  const [stats] = useState(mockStats);
   const [chartData] = useState(mockChartData);
   const [recentOrders] = useState(mockRecentOrders);
 

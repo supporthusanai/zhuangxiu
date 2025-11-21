@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Table, Card, Input, Select, Tag, Space, Button, Modal, message, Image } from 'antd';
+import { Table, Card, Input, Select, Tag, Space, Button, Modal, message } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 
 const mockCases = [
