@@ -21,6 +21,7 @@ PROJECT_NAME="zhuangxiu"
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_DIR="${PROJECT_DIR}/server"
 ADMIN_DIR="${PROJECT_DIR}/admin"
+WEB_DIR="${PROJECT_DIR}/web"
 MINIAPP_DIR="${PROJECT_DIR}"
 BACKUP_DIR="${PROJECT_DIR}/backups"
 LOG_DIR="${PROJECT_DIR}/logs"
@@ -52,7 +53,7 @@ print_menu() {
     echo "    2) 仅启动后端 API"
     echo "    3) 仅启动管理后台"
     echo "    4) 启动小程序 (微信)"
-    echo "    5) 启动 H5 前端"
+    echo "    5) 启动 PC 端网站"
     echo "    6) 停止开发环境"
     echo ""
     echo -e "  ${PURPLE}[生产环境]${NC}"
@@ -330,13 +331,14 @@ start_dev_all() {
     # 安装依赖
     install_deps "${SERVER_DIR}" "后端"
     install_deps "${ADMIN_DIR}" "管理后台"
+    install_deps "${WEB_DIR}" "PC端网站"
     install_deps "${MINIAPP_DIR}" "小程序"
 
     # 启动服务
     start_dev_server
     start_dev_admin
+    start_dev_web
     start_dev_miniapp
-    start_dev_h5
 
     echo ""
     log_info "全部开发服务已启动 ✓"
@@ -406,28 +408,25 @@ start_dev_miniapp() {
     log_info "小程序编译已启动，请用微信开发者工具打开 dist 目录"
 }
 
-start_dev_h5() {
-    # H5 需要 Node.js 20+
-    check_node_version
-
+start_dev_web() {
     mkdir -p "${LOG_DIR}"
-    install_deps "${MINIAPP_DIR}" "H5前端"
+    install_deps "${WEB_DIR}" "PC端网站"
 
     # 检查是否已运行
-    if [ -f "${LOG_DIR}/h5-dev.pid" ]; then
-        local pid=$(cat "${LOG_DIR}/h5-dev.pid")
+    if [ -f "${LOG_DIR}/web-dev.pid" ]; then
+        local pid=$(cat "${LOG_DIR}/web-dev.pid")
         if kill -0 "$pid" 2>/dev/null; then
-            log_warn "H5服务已在运行 (PID: $pid)"
+            log_warn "PC端网站已在运行 (PID: $pid)"
             return 0
         fi
     fi
 
-    log_info "启动 H5 前端..."
-    cd "${MINIAPP_DIR}"
-    npm run dev:h5 > "${LOG_DIR}/h5-dev.log" 2>&1 &
-    echo $! > "${LOG_DIR}/h5-dev.pid"
+    log_info "启动 PC 端网站..."
+    cd "${WEB_DIR}"
+    npm run dev > "${LOG_DIR}/web-dev.log" 2>&1 &
+    echo $! > "${LOG_DIR}/web-dev.pid"
     sleep 3
-    log_info "H5 前端已启动: http://localhost:10086"
+    log_info "PC 端网站已启动: http://localhost:3000"
 }
 
 print_dev_urls() {
@@ -436,14 +435,14 @@ print_dev_urls() {
     echo -e "${GREEN}  服务地址:${NC}"
     echo -e "    后端 API:     http://localhost:${API_PORT}"
     echo -e "    管理后台:     http://localhost:3001"
-    echo -e "    H5 前端:      http://localhost:10086"
+    echo -e "    PC端网站:     http://localhost:3000"
     echo -e "    小程序:       使用微信开发者工具打开 dist 目录"
     echo ""
     echo -e "${YELLOW}  日志文件:${NC}"
     echo -e "    后端:         ${LOG_DIR}/server-dev.log"
     echo -e "    管理后台:     ${LOG_DIR}/admin-dev.log"
+    echo -e "    PC端网站:     ${LOG_DIR}/web-dev.log"
     echo -e "    小程序:       ${LOG_DIR}/miniapp-dev.log"
-    echo -e "    H5:           ${LOG_DIR}/h5-dev.log"
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
     echo ""
 }
@@ -488,6 +487,12 @@ build_project() {
     # 构建管理后台
     log_info "构建管理后台..."
     cd "${ADMIN_DIR}"
+    npm install
+    npm run build
+
+    # 构建 PC 端网站
+    log_info "构建 PC 端网站..."
+    cd "${WEB_DIR}"
     npm install
     npm run build
 
@@ -1355,7 +1360,7 @@ main() {
             2) start_dev_server ;;
             3) start_dev_admin ;;
             4) start_dev_miniapp ;;
-            5) start_dev_h5 ;;
+            5) start_dev_web ;;
             6) stop_dev ;;
             7) deploy_production ;;
             8) restart_production ;;
@@ -1391,7 +1396,7 @@ if [ $# -gt 0 ]; then
         dev:server) start_dev_server ;;
         dev:admin) start_dev_admin ;;
         dev:miniapp) start_dev_miniapp ;;
-        dev:h5) start_dev_h5 ;;
+        dev:web) start_dev_web ;;
         dev:stop) stop_dev ;;
         deploy) deploy_production ;;
         restart) restart_production ;;
@@ -1413,7 +1418,7 @@ if [ $# -gt 0 ]; then
             echo "  dev:server   仅启动后端 API"
             echo "  dev:admin    仅启动管理后台"
             echo "  dev:miniapp  启动小程序编译"
-            echo "  dev:h5       启动 H5 前端"
+            echo "  dev:web      启动 PC 端网站"
             echo "  dev:stop     停止开发环境"
             echo ""
             echo "生产环境命令:"

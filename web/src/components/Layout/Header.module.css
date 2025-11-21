@@ -1,0 +1,66 @@
+.header {
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  height: 64px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  margin-right: 40px;
+}
+
+.logoText {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1890ff;
+}
+
+.menu {
+  flex: 1;
+  border-bottom: none;
+}
+
+.menu :global(.ant-menu-item) {
+  font-size: 15px;
+}
+
+.search {
+  margin-right: 24px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.3s;
+}
+
+.userInfo:hover {
+  background: #f5f5f5;
+}
+
+.nickname {
+  font-size: 14px;
+  color: #333;
+}

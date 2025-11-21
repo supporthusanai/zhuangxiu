@@ -40,3 +40,4 @@ logs
 .eslintcache
 .stylelintcache
 .swc/
+web/dist
