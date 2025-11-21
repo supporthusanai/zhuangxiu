@@ -64,8 +64,8 @@ export const designerApi = {
 
 // Review APIs
 export const reviewApi = {
-  getList: (params: { targetType: string; targetId: string; page?: number }) =>
-    api.get('/reviews', { params }),
+  getList: (targetType: string, targetId: string, params?: { page?: number }) =>
+    api.get(`/reviews/${targetType}/${targetId}`, { params }),
   create: (data: { targetType: string; targetId: string; rating: number; content: string }) =>
     api.post('/reviews', data),
 }
