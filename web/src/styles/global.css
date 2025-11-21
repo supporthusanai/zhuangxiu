@@ -25,3 +25,24 @@ a {
 .ant-btn-primary {
   background-color: #1890ff;
 }
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
+  }
+
+  .ant-card {
+    border-radius: 8px;
+  }
+
+  .ant-row {
+    margin-left: -8px !important;
+    margin-right: -8px !important;
+  }
+
+  .ant-col {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+}

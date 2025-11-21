@@ -128,3 +128,68 @@
   color: #666;
   margin-bottom: 4px;
 }
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .caseDetail {
+    padding: 20px 0;
+  }
+
+  .container {
+    padding: 0 16px;
+  }
+
+  .mainImage img {
+    max-height: 300px;
+  }
+
+  .imageGallery {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+  }
+
+  .imageGallery img {
+    height: 70px;
+  }
+
+  .title {
+    font-size: 20px;
+    margin-bottom: 12px;
+  }
+
+  .content h2 {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+
+  .content p {
+    font-size: 14px;
+  }
+
+  .metaItem {
+    padding: 10px 0;
+  }
+
+  .actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .mainImage img {
+    max-height: 220px;
+  }
+
+  .title {
+    font-size: 18px;
+  }
+
+  .imageGallery {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .imageGallery img {
+    height: 60px;
+  }
+}

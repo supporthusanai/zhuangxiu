@@ -64,3 +64,56 @@
   font-size: 14px;
   color: #333;
 }
+
+.mobileMenuBtn {
+  display: none;
+  font-size: 20px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
+    height: 56px;
+  }
+
+  .logo {
+    margin-right: 16px;
+  }
+
+  .logoText {
+    font-size: 18px;
+  }
+
+  .menu {
+    display: none;
+  }
+
+  .search {
+    display: none;
+  }
+
+  .mobileMenuBtn {
+    display: block;
+  }
+
+  .actions {
+    margin-left: auto;
+  }
+
+  .nickname {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    height: 50px;
+  }
+
+  .logoText {
+    font-size: 16px;
+  }
+}

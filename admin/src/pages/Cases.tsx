@@ -1,41 +1,92 @@
-import { useState } from 'react';
-import { Table, Card, Input, Select, Tag, Space, Button, Modal, message } from 'antd';
+import { useState, useEffect } from 'react';
+import { Table, Card, Input, Select, Tag, Space, Button, Modal, message, Image } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
+import { getCases, updateCaseStatus, deleteCase } from '../services/api';
 
-const mockCases = [
-  { id: '1', title: '现代简约·三居室', style: '现代简约', area: 120, price: 150000, merchant: '优家装饰', status: 'published', viewCount: 1286, createdAt: '2024-01-15' },
-  { id: '2', title: '北欧风格·两居室', style: '北欧风格', area: 95, price: 98000, merchant: '美居设计', status: 'draft', viewCount: 0, createdAt: '2024-01-18' },
-  { id: '3', title: '新中式·四居室', style: '新中式', area: 180, price: 280000, merchant: '匠心装饰', status: 'published', viewCount: 2156, createdAt: '2024-01-10' },
-  { id: '4', title: '轻奢风格·复式', style: '轻奢风格', area: 220, price: 450000, merchant: '简约空间', status: 'archived', viewCount: 856, createdAt: '2024-01-05' },
-];
+interface CaseItem {
+  _id: string;
+  title: string;
+  style: string;
+  area: number;
+  budget: number;
+  images: string[];
+  merchant?: { companyName: string };
+  status: string;
+  viewCount: number;
+  createdAt: string;
+}
 
 const Cases: React.FC = () => {
-  const [cases, setCases] = useState(mockCases);
-  const [loading] = useState(false);
+  const [cases, setCases] = useState<CaseItem[]>([]);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
 
-  const handleDelete = (record: any) => {
+  const fetchCases = async (page = 1, limit = 10) => {
+    setLoading(true);
+    try {
+      const params: any = { page, limit };
+      if (statusFilter) params.status = statusFilter;
+      if (search) params.keyword = search;
+
+      const res: any = await getCases(params);
+      if (res.success) {
+        setCases(res.data?.cases || []);
+        setPagination({
+          current: res.data?.pagination?.page || page,
+          pageSize: res.data?.pagination?.limit || limit,
+          total: res.data?.pagination?.total || 0,
+        });
+      }
+    } catch (error) {
+      console.error('获取案例列表失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCases();
+  }, [statusFilter]);
+
+  const handleSearch = () => {
+    fetchCases(1, pagination.pageSize);
+  };
+
+  const handleDelete = (record: CaseItem) => {
     Modal.confirm({
       title: '删除案例',
       content: `确定要删除「${record.title}」吗？此操作不可恢复。`,
-      onOk: () => {
-        setCases(cases.filter(c => c.id !== record.id));
-        message.success('删除成功');
+      onOk: async () => {
+        try {
+          const res: any = await deleteCase(record._id);
+          if (res.success) {
+            message.success('删除成功');
+            fetchCases(pagination.current, pagination.pageSize);
+          }
+        } catch (error) {
+          message.error('删除失败');
+        }
       },
     });
   };
 
-  const handleUpdateStatus = (record: any, status: string) => {
-    setCases(cases.map(c => c.id === record.id ? { ...c, status } : c));
-    message.success('状态更新成功');
+  const handleUpdateStatus = async (record: CaseItem, status: string) => {
+    try {
+      const res: any = await updateCaseStatus(record._id, status);
+      if (res.success) {
+        message.success('状态更新成功');
+        fetchCases(pagination.current, pagination.pageSize);
+      }
+    } catch (error) {
+      message.error('状态更新失败');
+    }
   };
 
-  const filteredCases = cases.filter(c => {
-    if (search && !c.title.includes(search) && !c.merchant.includes(search)) return false;
-    if (statusFilter && c.status !== statusFilter) return false;
-    return true;
-  });
+  const handleTableChange = (pag: any) => {
+    fetchCases(pag.current, pag.pageSize);
+  };
 
   const statusMap: Record<string, { color: string; text: string }> = {
     draft: { color: 'default', text: '草稿' },
@@ -44,21 +95,43 @@ const Cases: React.FC = () => {
   };
 
   const columns = [
+    {
+      title: '封面',
+      key: 'cover',
+      width: 80,
+      render: (_: any, record: CaseItem) => (
+        <Image src={record.images?.[0]} width={60} height={40} style={{ objectFit: 'cover' }} />
+      ),
+    },
     { title: '标题', dataIndex: 'title', key: 'title' },
     { title: '风格', dataIndex: 'style', key: 'style' },
-    { title: '面积', dataIndex: 'area', key: 'area', render: (v: number) => `${v}㎡` },
-    { title: '价格', dataIndex: 'price', key: 'price', render: (v: number) => `¥${v.toLocaleString()}` },
-    { title: '商家', dataIndex: 'merchant', key: 'merchant' },
+    { title: '面积', dataIndex: 'area', key: 'area', render: (v: number) => v ? `${v}㎡` : '-' },
+    { title: '预算', dataIndex: 'budget', key: 'budget', render: (v: number) => v ? `¥${v}万` : '-' },
+    { title: '商家', key: 'merchant', render: (_: any, r: CaseItem) => r.merchant?.companyName || '-' },
     { title: '浏览量', dataIndex: 'viewCount', key: 'viewCount' },
-    { title: '状态', dataIndex: 'status', key: 'status', render: (v: string) => <Tag color={statusMap[v]?.color}>{statusMap[v]?.text}</Tag> },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      render: (v: string) => <Tag color={statusMap[v]?.color}>{statusMap[v]?.text || v}</Tag>,
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (v: string) => v ? new Date(v).toLocaleDateString() : '-',
+    },
     {
       title: '操作',
       key: 'action',
-      render: (_: any, record: any) => (
+      render: (_: any, record: CaseItem) => (
         <Space>
-          {record.status === 'published' && <Button type="link" onClick={() => handleUpdateStatus(record, 'archived')}>下架</Button>}
-          {record.status === 'archived' && <Button type="link" onClick={() => handleUpdateStatus(record, 'published')}>上架</Button>}
+          {record.status === 'published' && (
+            <Button type="link" onClick={() => handleUpdateStatus(record, 'archived')}>下架</Button>
+          )}
+          {record.status === 'archived' && (
+            <Button type="link" onClick={() => handleUpdateStatus(record, 'published')}>上架</Button>
+          )}
           <Button type="link" danger onClick={() => handleDelete(record)}>删除</Button>
         </Space>
       ),
@@ -70,7 +143,15 @@ const Cases: React.FC = () => {
       title="案例管理"
       extra={
         <Space>
-          <Input placeholder="搜索案例" prefix={<SearchOutlined />} value={search} onChange={e => setSearch(e.target.value)} allowClear />
+          <Input
+            placeholder="搜索案例"
+            prefix={<SearchOutlined />}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onPressEnter={handleSearch}
+            allowClear
+          />
+          <Button type="primary" onClick={handleSearch}>搜索</Button>
           <Select placeholder="状态筛选" allowClear style={{ width: 120 }} value={statusFilter} onChange={setStatusFilter}>
             <Select.Option value="draft">草稿</Select.Option>
             <Select.Option value="published">已发布</Select.Option>
@@ -79,7 +160,14 @@ const Cases: React.FC = () => {
         </Space>
       }
     >
-      <Table columns={columns} dataSource={filteredCases} rowKey="id" loading={loading} pagination={{ pageSize: 10 }} />
+      <Table
+        columns={columns}
+        dataSource={cases}
+        rowKey="_id"
+        loading={loading}
+        pagination={pagination}
+        onChange={handleTableChange}
+      />
     </Card>
   );
 };

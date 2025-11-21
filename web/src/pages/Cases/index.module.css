@@ -107,3 +107,69 @@
   justify-content: center;
   margin-top: 40px;
 }
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .cases {
+    padding: 24px 0;
+  }
+
+  .container {
+    padding: 0 16px;
+  }
+
+  .header {
+    margin-bottom: 24px;
+  }
+
+  .header h1 {
+    font-size: 24px;
+  }
+
+  .header p {
+    font-size: 14px;
+  }
+
+  .filters {
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+
+  .filterGroup {
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .filterLabel {
+    width: auto;
+    padding-top: 0;
+  }
+
+  .filterOptions {
+    gap: 6px;
+  }
+
+  .filterOption {
+    padding: 4px 12px;
+    font-size: 13px;
+  }
+
+  .cardCover {
+    height: 160px;
+  }
+
+  .pagination {
+    margin-top: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header h1 {
+    font-size: 20px;
+  }
+
+  .cardCover {
+    height: 140px;
+  }
+}
