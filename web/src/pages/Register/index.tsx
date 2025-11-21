@@ -1,44 +1,23 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Form, Input, Button, message, Checkbox } from 'antd'
-import { MobileOutlined, SafetyOutlined, UserOutlined } from '@ant-design/icons'
+import { MobileOutlined, LockOutlined, UserOutlined } from '@ant-design/icons'
 import { authApi } from '@/services/api'
 import styles from './index.module.css'
 
 const Register = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
-  const [countdown, setCountdown] = useState(0)
   const [form] = Form.useForm()
 
-  const handleSendCode = async () => {
-    const phone = form.getFieldValue('phone')
-    if (!phone || !/^1[3-9]\d{9}$/.test(phone)) {
-      message.warning('请输入正确的手机号')
+  const handleSubmit = async (values: { phone: string; password: string; confirmPassword: string; nickname: string; agreement: boolean }) => {
+    if (!values.agreement) {
+      message.warning('请阅读并同意服务协议')
       return
     }
 
-    try {
-      await authApi.sendCode(phone)
-      message.success('验证码已发送')
-      setCountdown(60)
-      const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer)
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-    } catch (error: any) {
-      message.error(error.message || '发送失败')
-    }
-  }
-
-  const handleSubmit = async (values: { phone: string; code: string; nickname: string; agreement: boolean }) => {
-    if (!values.agreement) {
-      message.warning('请阅读并同意服务协议')
+    if (values.password !== values.confirmPassword) {
+      message.warning('两次输入的密码不一致')
       return
     }
 
@@ -46,7 +25,7 @@ const Register = () => {
     try {
       const res: any = await authApi.register({
         phone: values.phone,
-        code: values.code,
+        password: values.password,
         nickname: values.nickname,
       })
       localStorage.setItem('token', res.data.token)
@@ -84,30 +63,45 @@ const Register = () => {
             </Form.Item>
 
             <Form.Item
-              name="code"
-              rules={[{ required: true, message: '请输入验证码' }]}
-            >
-              <div className={styles.codeInput}>
-                <Input
-                  prefix={<SafetyOutlined />}
-                  placeholder="请输入验证码"
-                />
-                <Button
-                  disabled={countdown > 0}
-                  onClick={handleSendCode}
-                >
-                  {countdown > 0 ? `${countdown}s后重发` : '获取验证码'}
-                </Button>
-              </div>
-            </Form.Item>
-
-            <Form.Item
               name="nickname"
               rules={[{ required: true, message: '请输入昵称' }]}
             >
               <Input
                 prefix={<UserOutlined />}
                 placeholder="请输入昵称"
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="password"
+              rules={[
+                { required: true, message: '请输入密码' },
+                { min: 6, message: '密码至少6个字符' },
+              ]}
+            >
+              <Input.Password
+                prefix={<LockOutlined />}
+                placeholder="请输入密码"
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="confirmPassword"
+              rules={[
+                { required: true, message: '请确认密码' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (!value || getFieldValue('password') === value) {
+                      return Promise.resolve()
+                    }
+                    return Promise.reject(new Error('两次输入的密码不一致'))
+                  },
+                }),
+              ]}
+            >
+              <Input.Password
+                prefix={<LockOutlined />}
+                placeholder="请确认密码"
               />
             </Form.Item>
 

@@ -268,6 +268,163 @@ export const updateProfile = async (
   }
 };
 
+// 账号密码注册
+export const register = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { phone, password, nickname } = req.body;
+
+    if (!phone || !password) {
+      throw new AppError('手机号和密码不能为空', 400);
+    }
+
+    if (!validatePhone(phone)) {
+      throw new AppError('手机号格式不正确', 400);
+    }
+
+    if (password.length < 6) {
+      throw new AppError('密码至少6个字符', 400);
+    }
+
+    // 检查手机号是否已注册
+    const existingUser = await User.findOne({ phone });
+    if (existingUser) {
+      throw new AppError('该手机号已注册', 400);
+    }
+
+    // 创建用户
+    const user = await User.create({
+      phone,
+      password,
+      nickname: nickname || `用户${phone.slice(-4)}`,
+    });
+
+    // 生成 token
+    const token = generateToken(user._id.toString());
+
+    res.status(201).json({
+      success: true,
+      message: '注册成功',
+      data: {
+        token,
+        user: {
+          id: user._id,
+          nickname: user.nickname,
+          avatar: user.avatar,
+          phone: user.phone,
+          role: user.role,
+        },
+      },
+    });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '注册失败',
+    });
+  }
+};
+
+// 账号密码登录
+export const passwordLogin = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { phone, password } = req.body;
+
+    if (!phone || !password) {
+      throw new AppError('手机号和密码不能为空', 400);
+    }
+
+    // 查找用户（需要选择密码字段）
+    const user = await User.findOne({ phone }).select('+password');
+
+    if (!user) {
+      throw new AppError('用户不存在', 404);
+    }
+
+    if (!user.password) {
+      throw new AppError('该账号未设置密码，请使用验证码登录', 400);
+    }
+
+    // 验证密码
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      throw new AppError('密码错误', 400);
+    }
+
+    if (!user.isActive) {
+      throw new AppError('账号已被禁用', 403);
+    }
+
+    // 生成 token
+    const token = generateToken(user._id.toString());
+
+    res.status(200).json({
+      success: true,
+      message: '登录成功',
+      data: {
+        token,
+        user: {
+          id: user._id,
+          nickname: user.nickname,
+          avatar: user.avatar,
+          phone: user.phone,
+          role: user.role,
+        },
+      },
+    });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '登录失败',
+    });
+  }
+};
+
+// 修改密码
+export const changePassword = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      throw new AppError('新密码至少6个字符', 400);
+    }
+
+    const user = await User.findById(req.userId).select('+password');
+
+    if (!user) {
+      throw new AppError('用户不存在', 404);
+    }
+
+    // 如果有旧密码，需要验证
+    if (user.password && oldPassword) {
+      const isMatch = await user.comparePassword(oldPassword);
+      if (!isMatch) {
+        throw new AppError('原密码错误', 400);
+      }
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: '密码修改成功',
+    });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '修改密码失败',
+    });
+  }
+};
+
 // 获取微信手机号
 export const getWechatPhone = async (
   req: AuthRequest,

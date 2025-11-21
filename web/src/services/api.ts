@@ -32,10 +32,18 @@ api.interceptors.response.use(
 
 // Auth APIs
 export const authApi = {
-  login: (data: { phone: string; code: string }) => api.post('/auth/login', data),
+  // 密码登录
+  login: (data: { phone: string; password: string }) => api.post('/auth/login', data),
+  // 验证码登录
+  phoneLogin: (data: { phone: string; code: string }) => api.post('/auth/phone-login', data),
+  // 发送验证码
   sendCode: (phone: string) => api.post('/auth/send-code', { phone }),
-  register: (data: { phone: string; code: string; nickname: string }) => api.post('/auth/register', data),
-  getProfile: () => api.get('/auth/profile'),
+  // 注册
+  register: (data: { phone: string; password: string; nickname?: string }) => api.post('/auth/register', data),
+  // 获取用户信息
+  getProfile: () => api.get('/auth/me'),
+  // 修改密码
+  changePassword: (data: { oldPassword?: string; newPassword: string }) => api.put('/auth/password', data),
 }
 
 // Case APIs

@@ -1407,6 +1407,7 @@ if [ $# -gt 0 ]; then
         backup) backup_database ;;
         restore) restore_database ;;
         init) init_environment ;;
+        init:project) node "${PROJECT_DIR}/scripts/init.js" ;;
         ssl) update_ssl ;;
         clean) clean_logs ;;
         docker) docker_menu ;;
@@ -1433,6 +1434,7 @@ if [ $# -gt 0 ]; then
             echo "  backup       备份数据库"
             echo "  restore      恢复数据库"
             echo "  init         初始化环境"
+            echo "  init:project 项目初始化向导（安装依赖、配置环境、创建管理员）"
             echo "  ssl          SSL 证书管理"
             echo "  clean        清理日志"
             echo "  docker       Docker 管理"
