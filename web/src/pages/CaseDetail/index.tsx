@@ -51,11 +51,14 @@ const CaseDetail = () => {
   }
 
   const checkFavorite = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+
     try {
       const res: any = await favoriteApi.check('case', id!)
-      setIsFavorite(res.data?.isFavorite || false)
+      setIsFavorite(res.data?.isFavorited || false)
     } catch (error) {
-      // User not logged in
+      // User not logged in or error
     }
   }
 
@@ -68,11 +71,11 @@ const CaseDetail = () => {
 
     try {
       if (isFavorite) {
-        await favoriteApi.remove(id!)
+        await favoriteApi.remove('case', id!)
         setIsFavorite(false)
         message.success('已取消收藏')
       } else {
-        await favoriteApi.add({ type: 'case', targetId: id! })
+        await favoriteApi.add({ targetType: 'case', targetId: id! })
         setIsFavorite(true)
         message.success('收藏成功')
       }

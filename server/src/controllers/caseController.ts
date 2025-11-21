@@ -4,6 +4,7 @@ import BrowseHistory from '../models/BrowseHistory';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { redisClient } from '../config/database';
+import { escapeRegex, validatePagination, validateSortField } from '../utils/sanitize';
 
 // 获取案例列表
 export const getCases = async (
@@ -11,17 +12,10 @@ export const getCases = async (
   res: Response
 ): Promise<void> => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      style,
-      minArea,
-      maxArea,
-      minPrice,
-      maxPrice,
-      sort = 'createdAt',
-      order = 'desc',
-    } = req.query;
+    const { style, minArea, maxArea, minPrice, maxPrice, order = 'desc' } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
+    const allowedSortFields = ['createdAt', 'viewCount', 'favoriteCount', 'price', 'area'];
+    const sortField = validateSortField(req.query.sort as string, allowedSortFields);
 
     // 构建查询条件
     const query: any = { status: 'published' };
@@ -41,10 +35,7 @@ export const getCases = async (
     // 构建排序
     const sortOrder = order === 'asc' ? 1 : -1;
     const sortObj: any = {};
-    sortObj[sort as string] = sortOrder;
-
-    // 分页
-    const skip = (Number(page) - 1) * Number(limit);
+    sortObj[sortField] = sortOrder;
 
     // 查询
     const [cases, total] = await Promise.all([
@@ -52,7 +43,7 @@ export const getCases = async (
         .populate('designer', 'name avatar title')
         .sort(sortObj)
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(limit),
       Case.countDocuments(query),
     ]);
 
@@ -132,14 +123,15 @@ export const searchCases = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { keyword, page = 1, limit = 10 } = req.query;
+    const { keyword } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
 
     if (!keyword) {
       throw new AppError('搜索关键词不能为空', 400);
     }
 
     const searchKeyword = keyword as string;
-    const skip = (Number(page) - 1) * Number(limit);
+    const escapedKeyword = escapeRegex(searchKeyword);
 
     let cases: any[];
     let total: number;
@@ -156,7 +148,7 @@ export const searchCases = async (
         .populate('designer', 'name avatar title')
         .sort({ score: { $meta: 'textScore' }, viewCount: -1 })
         .skip(skip)
-        .limit(Number(limit));
+        .limit(limit);
 
       if (textSearchResults.length > 0) {
         cases = textSearchResults;
@@ -165,14 +157,14 @@ export const searchCases = async (
         throw new Error('No text search results');
       }
     } catch {
-      // 回退到正则搜索
+      // 回退到正则搜索（使用转义后的关键词防止注入）
       const regexQuery = {
         status: 'published',
         $or: [
-          { title: { $regex: searchKeyword, $options: 'i' } },
-          { description: { $regex: searchKeyword, $options: 'i' } },
-          { style: { $regex: searchKeyword, $options: 'i' } },
-          { tags: { $regex: searchKeyword, $options: 'i' } },
+          { title: { $regex: escapedKeyword, $options: 'i' } },
+          { description: { $regex: escapedKeyword, $options: 'i' } },
+          { style: { $regex: escapedKeyword, $options: 'i' } },
+          { tags: { $regex: escapedKeyword, $options: 'i' } },
         ],
       };
 
@@ -181,7 +173,7 @@ export const searchCases = async (
           .populate('designer', 'name avatar title')
           .sort({ viewCount: -1, createdAt: -1 })
           .skip(skip)
-          .limit(Number(limit)),
+          .limit(limit),
         Case.countDocuments(regexQuery),
       ]);
     }

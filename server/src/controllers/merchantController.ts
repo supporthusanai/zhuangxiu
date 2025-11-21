@@ -4,6 +4,7 @@ import User from '../models/User';
 import Designer from '../models/Designer';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { validatePagination } from '../utils/sanitize';
 
 // 申请成为商家
 export const applyMerchant = async (
@@ -133,21 +134,20 @@ export const getMerchants = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page = 1, limit = 20, status } = req.query;
+    const { status } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
 
     const query: any = {};
     if (status) {
       query.status = status;
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
-
     const [merchants, total] = await Promise.all([
       Merchant.find(query)
         .populate('user', 'nickname avatar phone')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(limit),
       Merchant.countDocuments(query),
     ]);
 
@@ -198,9 +198,12 @@ export const reviewMerchant = async (
 
     await merchant.save();
 
-    // 如果审核通过，更新用户角色为商家
+    // 如果审核通过，更新用户角色为商家并绑定商家ID
     if (status === 'approved') {
-      await User.findByIdAndUpdate(merchant.user, { role: 'merchant' });
+      await User.findByIdAndUpdate(merchant.user, {
+        role: 'merchant',
+        merchantId: merchant._id
+      });
     }
 
     res.status(200).json({

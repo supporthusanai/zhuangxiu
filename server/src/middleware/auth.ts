@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import User from '../models/User';
+import { verifyToken } from '../utils/jwt';
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -28,9 +28,7 @@ export const authenticate = async (
     }
 
     // 验证 token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as {
-      userId: string;
-    };
+    const decoded = verifyToken(token);
 
     // 查找用户
     const user = await User.findById(decoded.userId);
@@ -148,10 +146,7 @@ export const optionalAuth = async (
     const token = req.header('Authorization')?.replace('Bearer ', '');
 
     if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as {
-        userId: string;
-      };
-
+      const decoded = verifyToken(token);
       const user = await User.findById(decoded.userId);
 
       if (user && user.isActive) {

@@ -2,6 +2,7 @@ import { Response } from 'express';
 import Order from '../models/Order';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { validatePagination } from '../utils/sanitize';
 
 // 创建订单
 export const createOrder = async (
@@ -44,8 +45,8 @@ export const getUserOrders = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page = 1, limit = 10, status } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const { status } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
 
     const query: any = { user: req.userId };
     if (status) query.status = status;
@@ -56,7 +57,7 @@ export const getUserOrders = async (
         .populate('designer', 'name avatar')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(limit),
       Order.countDocuments(query),
     ]);
 
@@ -86,8 +87,8 @@ export const getMerchantOrders = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page = 1, limit = 10, status, paymentStatus } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const { status, paymentStatus } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
 
     const query: any = { merchant: req.user.merchantId };
     if (status) query.status = status;
@@ -99,7 +100,7 @@ export const getMerchantOrders = async (
         .populate('designer', 'name avatar')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(limit),
       Order.countDocuments(query),
     ]);
 

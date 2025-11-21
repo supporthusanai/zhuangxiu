@@ -40,16 +40,44 @@ const Cases = () => {
   const fetchCases = async () => {
     setLoading(true)
     try {
-      const params: any = { page, pageSize }
+      const params: any = { page, limit: pageSize }
       if (filters.style !== '全部') params.style = filters.style
-      if (filters.area !== '全部') params.area = filters.area
-      if (filters.budget !== '全部') params.budget = filters.budget
+      if (filters.area !== '全部') {
+        // 解析面积范围
+        const areaMap: Record<string, { minArea?: number; maxArea?: number }> = {
+          '50-80m²': { minArea: 50, maxArea: 80 },
+          '80-120m²': { minArea: 80, maxArea: 120 },
+          '120-150m²': { minArea: 120, maxArea: 150 },
+          '150m²以上': { minArea: 150 },
+        }
+        const areaRange = areaMap[filters.area]
+        if (areaRange) {
+          if (areaRange.minArea) params.minArea = areaRange.minArea
+          if (areaRange.maxArea) params.maxArea = areaRange.maxArea
+        }
+      }
+      if (filters.budget !== '全部') {
+        // 解析预算范围
+        const budgetMap: Record<string, { minPrice?: number; maxPrice?: number }> = {
+          '10万以下': { maxPrice: 100000 },
+          '10-20万': { minPrice: 100000, maxPrice: 200000 },
+          '20-50万': { minPrice: 200000, maxPrice: 500000 },
+          '50万以上': { minPrice: 500000 },
+        }
+        const budgetRange = budgetMap[filters.budget]
+        if (budgetRange) {
+          if (budgetRange.minPrice) params.minPrice = budgetRange.minPrice
+          if (budgetRange.maxPrice) params.maxPrice = budgetRange.maxPrice
+        }
+      }
 
       const res: any = await caseApi.getList(params)
-      setCases(res.data?.list || [])
-      setTotal(res.data?.total || 0)
+      setCases(res.data?.cases || res.data?.list || [])
+      setTotal(res.data?.pagination?.total || res.data?.total || 0)
     } catch (error) {
       console.error('Failed to fetch cases:', error)
+      setCases([])
+      setTotal(0)
     } finally {
       setLoading(false)
     }

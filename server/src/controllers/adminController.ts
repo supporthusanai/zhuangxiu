@@ -5,6 +5,7 @@ import Case from '../models/Case';
 import Order from '../models/Order';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { escapeRegex, validatePagination } from '../utils/sanitize';
 
 // 获取用户列表
 export const getUsers = async (
@@ -12,20 +13,21 @@ export const getUsers = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page = 1, limit = 10, role, search } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const { role, search } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
 
     const query: any = {};
     if (role) query.role = role;
     if (search) {
+      const escapedSearch = escapeRegex(search as string);
       query.$or = [
-        { nickname: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } },
+        { nickname: { $regex: escapedSearch, $options: 'i' } },
+        { phone: { $regex: escapedSearch, $options: 'i' } },
       ];
     }
 
     const [users, total] = await Promise.all([
-      User.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
+      User.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
       User.countDocuments(query),
     ]);
 
@@ -66,20 +68,21 @@ export const getMerchants = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page = 1, limit = 10, status, search } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const { status, search } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
 
     const query: any = {};
     if (status) query.status = status;
     if (search) {
+      const escapedSearch = escapeRegex(search as string);
       query.$or = [
-        { companyName: { $regex: search, $options: 'i' } },
-        { contactPerson: { $regex: search, $options: 'i' } },
+        { companyName: { $regex: escapedSearch, $options: 'i' } },
+        { contactPerson: { $regex: escapedSearch, $options: 'i' } },
       ];
     }
 
     const [merchants, total] = await Promise.all([
-      Merchant.find(query).populate('owner', 'nickname phone').sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
+      Merchant.find(query).populate('owner', 'nickname phone').sort({ createdAt: -1 }).skip(skip).limit(limit),
       Merchant.countDocuments(query),
     ]);
 
@@ -129,15 +132,16 @@ export const getAllOrders = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page = 1, limit = 10, status, search } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const { status, search } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
 
     const query: any = {};
     if (status) query.status = status;
     if (search) {
+      const escapedSearch = escapeRegex(search as string);
       query.$or = [
-        { orderNo: { $regex: search, $options: 'i' } },
-        { projectName: { $regex: search, $options: 'i' } },
+        { orderNo: { $regex: escapedSearch, $options: 'i' } },
+        { projectName: { $regex: escapedSearch, $options: 'i' } },
       ];
     }
 
@@ -147,7 +151,7 @@ export const getAllOrders = async (
         .populate('merchant', 'companyName')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(limit),
       Order.countDocuments(query),
     ]);
 

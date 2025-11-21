@@ -1,35 +1,10 @@
 import { Response } from 'express';
-import jwt, { SignOptions } from 'jsonwebtoken';
 import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { wechatLogin as wechatLoginApi, getPhoneNumber } from '../utils/wechat';
 import { sendSmsCode, verifySmsCode, validatePhone } from '../utils/sms';
-import logger from '../config/logger';
-
-// 获取 JWT 密钥（生产环境必须配置）
-const getJwtSecret = (): string => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret || secret === 'secret') {
-    if (process.env.NODE_ENV === 'production') {
-      logger.error('JWT_SECRET 未配置或使用了默认值，生产环境不允许启动！');
-      throw new Error('JWT_SECRET must be configured in production');
-    }
-    logger.warn('警告：JWT_SECRET 使用了默认值，仅限开发环境使用！');
-    return 'dev-secret-change-in-production';
-  }
-  return secret;
-};
-
-// 生成 JWT Token
-const generateToken = (userId: string): string => {
-  const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
-  return jwt.sign(
-    { userId },
-    getJwtSecret(),
-    { expiresIn } as jwt.SignOptions
-  );
-};
+import { generateToken } from '../utils/jwt';
 
 // 微信小程序登录
 export const wechatLogin = async (
@@ -402,8 +377,11 @@ export const changePassword = async (
       throw new AppError('用户不存在', 404);
     }
 
-    // 如果有旧密码，需要验证
-    if (user.password && oldPassword) {
+    // 如果用户已设置密码，必须验证旧密码
+    if (user.password) {
+      if (!oldPassword) {
+        throw new AppError('请输入原密码', 400);
+      }
       const isMatch = await user.comparePassword(oldPassword);
       if (!isMatch) {
         throw new AppError('原密码错误', 400);

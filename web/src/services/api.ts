@@ -72,10 +72,10 @@ export const reviewApi = {
 
 // Favorite APIs
 export const favoriteApi = {
-  getList: (type: string) => api.get('/favorites', { params: { type } }),
-  add: (data: { type: string; targetId: string }) => api.post('/favorites', data),
-  remove: (id: string) => api.delete(`/favorites/${id}`),
-  check: (type: string, targetId: string) => api.get('/favorites/check', { params: { type, targetId } }),
+  getList: (targetType?: string) => api.get('/favorites', { params: { targetType } }),
+  add: (data: { targetType: string; targetId: string }) => api.post('/favorites', data),
+  remove: (targetType: string, targetId: string) => api.delete(`/favorites/${targetType}/${targetId}`),
+  check: (targetType: string, targetId: string) => api.get(`/favorites/check/${targetType}/${targetId}`),
 }
 
 // Appointment APIs

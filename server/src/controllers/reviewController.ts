@@ -1,8 +1,10 @@
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import Review from '../models/Review';
 import Order from '../models/Order';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { validatePagination, isValidObjectId } from '../utils/sanitize';
 
 // 创建评价
 export const createReview = async (
@@ -12,6 +14,31 @@ export const createReview = async (
   try {
     const { targetType, targetId, orderId, rating, content, images, tags, isAnonymous } = req.body;
     const userId = req.user!._id;
+
+    // 验证必填字段
+    if (!targetType || !targetId || !rating) {
+      throw new AppError('缺少必填参数', 400);
+    }
+
+    // 验证评分范围
+    const numRating = Number(rating);
+    if (isNaN(numRating) || numRating < 1 || numRating > 5) {
+      throw new AppError('评分必须在1-5之间', 400);
+    }
+
+    // 验证目标类型
+    if (!['merchant', 'designer', 'case'].includes(targetType)) {
+      throw new AppError('无效的评价目标类型', 400);
+    }
+
+    // 验证ObjectId格式
+    if (!isValidObjectId(targetId)) {
+      throw new AppError('无效的目标ID', 400);
+    }
+
+    if (orderId && !isValidObjectId(orderId)) {
+      throw new AppError('无效的订单ID', 400);
+    }
 
     // 检查是否已评价
     const existingReview = await Review.findOne({
@@ -33,6 +60,9 @@ export const createReview = async (
       if (order.status !== 'completed') {
         throw new AppError('订单未完成，无法评价', 400);
       }
+      if (order.isReviewed) {
+        throw new AppError('该订单已评价', 400);
+      }
     }
 
     const review = await Review.create({
@@ -40,10 +70,10 @@ export const createReview = async (
       targetType,
       targetId,
       order: orderId,
-      rating,
-      content,
-      images: images || [],
-      tags: tags || [],
+      rating: numRating,
+      content: content || '',
+      images: Array.isArray(images) ? images.slice(0, 9) : [],
+      tags: Array.isArray(tags) ? tags.slice(0, 10) : [],
       isAnonymous: isAnonymous || false,
     });
 
@@ -72,8 +102,16 @@ export const getReviews = async (
 ): Promise<void> => {
   try {
     const { targetType, targetId } = req.params;
-    const { page = 1, limit = 10, sort = 'newest' } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const { sort = 'newest' } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
+
+    // 验证参数
+    if (!isValidObjectId(targetId)) {
+      throw new AppError('无效的目标ID', 400);
+    }
+
+    const allowedSorts = ['newest', 'oldest', 'highest', 'lowest', 'popular'];
+    const sortKey = allowedSorts.includes(sort as string) ? sort as string : 'newest';
 
     const sortOptions: Record<string, any> = {
       newest: { createdAt: -1 },
@@ -83,15 +121,17 @@ export const getReviews = async (
       popular: { likes: -1 },
     };
 
+    const objectId = new mongoose.Types.ObjectId(targetId);
+
     const [reviews, total, stats] = await Promise.all([
       Review.find({ targetType, targetId, status: 'approved' })
         .populate('user', 'nickname avatar')
-        .sort(sortOptions[sort as string] || sortOptions.newest)
+        .sort(sortOptions[sortKey])
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(limit),
       Review.countDocuments({ targetType, targetId, status: 'approved' }),
       Review.aggregate([
-        { $match: { targetType, targetId: require('mongoose').Types.ObjectId.createFromHexString(targetId), status: 'approved' } },
+        { $match: { targetType, targetId: objectId, status: 'approved' } },
         {
           $group: {
             _id: null,

@@ -70,6 +70,9 @@ export interface IOrder extends Document {
   customerNote?: string;        // 客户备注
   merchantNote?: string;        // 商家备注
 
+  // 评价状态
+  isReviewed: boolean;          // 是否已评价
+
   // 联系信息
   contactName: string;          // 联系人
   contactPhone: string;         // 联系电话
@@ -184,6 +187,10 @@ const OrderSchema = new Schema<IOrder>(
     actualEndDate: Date,
     customerNote: String,
     merchantNote: String,
+    isReviewed: {
+      type: Boolean,
+      default: false,
+    },
     contactName: {
       type: String,
       required: [true, '联系人不能为空'],

@@ -4,6 +4,7 @@ import Case from '../models/Case';
 import Designer from '../models/Designer';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { validatePagination, isValidObjectId } from '../utils/sanitize';
 
 // 添加收藏
 export const addFavorite = async (
@@ -17,6 +18,14 @@ export const addFavorite = async (
       throw new AppError('参数不完整', 400);
     }
 
+    if (!['case', 'designer'].includes(targetType)) {
+      throw new AppError('无效的收藏类型', 400);
+    }
+
+    if (!isValidObjectId(targetId)) {
+      throw new AppError('无效的目标ID', 400);
+    }
+
     // 检查是否已收藏
     const existing = await Favorite.findOne({
       user: req.userId,
@@ -28,15 +37,16 @@ export const addFavorite = async (
       throw new AppError('已经收藏过了', 400);
     }
 
-    // 验证目标是否存在
+    // 验证目标是否存在并原子更新收藏数
     if (targetType === 'case') {
-      const caseExists = await Case.findById(targetId);
-      if (!caseExists) {
+      const caseUpdated = await Case.findByIdAndUpdate(
+        targetId,
+        { $inc: { favoriteCount: 1 } },
+        { new: true }
+      );
+      if (!caseUpdated) {
         throw new AppError('案例不存在', 404);
       }
-      // 更新收藏数
-      caseExists.favoriteCount += 1;
-      await caseExists.save();
     } else if (targetType === 'designer') {
       const designerExists = await Designer.findById(targetId);
       if (!designerExists) {
@@ -72,6 +82,10 @@ export const removeFavorite = async (
   try {
     const { targetType, targetId } = req.params;
 
+    if (!isValidObjectId(targetId)) {
+      throw new AppError('无效的目标ID', 400);
+    }
+
     const favorite = await Favorite.findOne({
       user: req.userId,
       targetType,
@@ -82,13 +96,12 @@ export const removeFavorite = async (
       throw new AppError('收藏记录不存在', 404);
     }
 
-    // 更新收藏数
+    // 原子更新收藏数（确保不会小于0）
     if (targetType === 'case') {
-      const caseItem = await Case.findById(targetId);
-      if (caseItem && caseItem.favoriteCount > 0) {
-        caseItem.favoriteCount -= 1;
-        await caseItem.save();
-      }
+      await Case.findOneAndUpdate(
+        { _id: targetId, favoriteCount: { $gt: 0 } },
+        { $inc: { favoriteCount: -1 } }
+      );
     }
 
     await favorite.deleteOne();
@@ -111,14 +124,13 @@ export const getMyFavorites = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { targetType, page = 1, limit = 20 } = req.query;
+    const { targetType } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
 
     const query: any = { user: req.userId };
-    if (targetType) {
+    if (targetType && ['case', 'designer'].includes(targetType as string)) {
       query.targetType = targetType;
     }
-
-    const skip = (Number(page) - 1) * Number(limit);
 
     const [favorites, total] = await Promise.all([
       Favorite.find(query)
@@ -130,7 +142,7 @@ export const getMyFavorites = async (
         })
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(limit),
       Favorite.countDocuments(query),
     ]);
 
