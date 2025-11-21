@@ -35,26 +35,26 @@ export default defineAppConfig({
       {
         pagePath: 'pages/index/index',
         text: '首页',
-        iconPath: 'assets/icons/home.png',
-        selectedIconPath: 'assets/icons/home-active.png'
+        iconPath: 'assets/icons/home.svg',
+        selectedIconPath: 'assets/icons/home-active.svg'
       },
       {
         pagePath: 'pages/cases/index',
         text: '案例',
-        iconPath: 'assets/icons/case.png',
-        selectedIconPath: 'assets/icons/case-active.png'
+        iconPath: 'assets/icons/case.svg',
+        selectedIconPath: 'assets/icons/case-active.svg'
       },
       {
         pagePath: 'pages/designers/index',
         text: '设计师',
-        iconPath: 'assets/icons/designer.png',
-        selectedIconPath: 'assets/icons/designer-active.png'
+        iconPath: 'assets/icons/designer.svg',
+        selectedIconPath: 'assets/icons/designer-active.svg'
       },
       {
         pagePath: 'pages/mine/index',
         text: '我的',
-        iconPath: 'assets/icons/mine.png',
-        selectedIconPath: 'assets/icons/mine-active.png'
+        iconPath: 'assets/icons/mine.svg',
+        selectedIconPath: 'assets/icons/mine-active.svg'
       }
     ]
   }
