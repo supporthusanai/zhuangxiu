@@ -48,28 +48,32 @@ print_menu() {
     echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${YELLOW}请选择操作:${NC}\n"
     echo -e "  ${GREEN}[开发环境]${NC}"
-    echo "    1) 启动开发环境 (热重载)"
-    echo "    2) 停止开发环境"
+    echo "    1) 启动全部开发服务"
+    echo "    2) 仅启动后端 API"
+    echo "    3) 仅启动管理后台"
+    echo "    4) 启动小程序 (微信)"
+    echo "    5) 启动 H5 前端"
+    echo "    6) 停止开发环境"
     echo ""
     echo -e "  ${PURPLE}[生产环境]${NC}"
-    echo "    3) 部署生产环境 (零停机)"
-    echo "    4) 重启生产服务"
-    echo "    5) 停止生产服务"
+    echo "    7) 部署生产环境 (零停机)"
+    echo "    8) 重启生产服务"
+    echo "    9) 停止生产服务"
     echo ""
     echo -e "  ${CYAN}[服务管理]${NC}"
-    echo "    6) 查看服务状态"
-    echo "    7) 查看实时日志"
-    echo "    8) 健康检查"
+    echo "   10) 查看服务状态"
+    echo "   11) 查看实时日志"
+    echo "   12) 健康检查"
     echo ""
     echo -e "  ${YELLOW}[数据库管理]${NC}"
-    echo "    9) 备份数据库"
-    echo "   10) 恢复数据库"
+    echo "   13) 备份数据库"
+    echo "   14) 恢复数据库"
     echo ""
     echo -e "  ${RED}[系统管理]${NC}"
-    echo "   11) 初始化环境"
-    echo "   12) 更新SSL证书"
-    echo "   13) 清理日志"
-    echo "   14) Docker Compose 管理"
+    echo "   15) 初始化环境"
+    echo "   16) 更新SSL证书"
+    echo "   17) 清理日志"
+    echo "   18) Docker Compose 管理"
     echo ""
     echo "    0) 退出"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -167,67 +171,151 @@ check_services() {
 # 开发环境
 #===============================================================================
 
-start_dev() {
-    log_step "启动开发环境..."
+install_deps() {
+    local dir=$1
+    local name=$2
+    cd "$dir"
+    if [ ! -d "node_modules" ] || [ ! -f "node_modules/.package-lock.json" ]; then
+        log_info "安装${name}依赖..."
+        npm install
+    else
+        log_info "${name}依赖已安装 ✓"
+    fi
+}
 
+start_dev_all() {
+    log_step "启动全部开发服务..."
     check_services
-
-    # 创建日志目录
     mkdir -p "${LOG_DIR}"
 
     # 安装依赖
-    log_info "安装后端依赖..."
-    cd "${SERVER_DIR}"
-    npm install
+    install_deps "${SERVER_DIR}" "后端"
+    install_deps "${ADMIN_DIR}" "管理后台"
+    install_deps "${MINIAPP_DIR}" "小程序"
 
-    log_info "安装管理后台依赖..."
-    cd "${ADMIN_DIR}"
-    npm install
+    # 启动服务
+    start_dev_server
+    start_dev_admin
+    start_dev_miniapp
 
-    log_info "安装小程序依赖..."
-    cd "${MINIAPP_DIR}"
-    npm install
+    echo ""
+    log_info "全部开发服务已启动 ✓"
+    print_dev_urls
+}
 
-    # 启动后端 (开发模式)
-    log_info "启动后端服务 (开发模式)..."
+start_dev_server() {
+    mkdir -p "${LOG_DIR}"
+    install_deps "${SERVER_DIR}" "后端"
+
+    # 检查是否已运行
+    if [ -f "${LOG_DIR}/server-dev.pid" ]; then
+        local pid=$(cat "${LOG_DIR}/server-dev.pid")
+        if kill -0 "$pid" 2>/dev/null; then
+            log_warn "后端服务已在运行 (PID: $pid)"
+            return 0
+        fi
+    fi
+
+    log_info "启动后端服务..."
     cd "${SERVER_DIR}"
     npm run dev > "${LOG_DIR}/server-dev.log" 2>&1 &
     echo $! > "${LOG_DIR}/server-dev.pid"
+    sleep 2
+    log_info "后端服务已启动: http://localhost:${API_PORT}"
+}
 
-    # 启动管理后台 (开发模式)
-    log_info "启动管理后台 (开发模式)..."
+start_dev_admin() {
+    mkdir -p "${LOG_DIR}"
+    install_deps "${ADMIN_DIR}" "管理后台"
+
+    # 检查是否已运行
+    if [ -f "${LOG_DIR}/admin-dev.pid" ]; then
+        local pid=$(cat "${LOG_DIR}/admin-dev.pid")
+        if kill -0 "$pid" 2>/dev/null; then
+            log_warn "管理后台已在运行 (PID: $pid)"
+            return 0
+        fi
+    fi
+
+    log_info "启动管理后台..."
     cd "${ADMIN_DIR}"
     npm run dev > "${LOG_DIR}/admin-dev.log" 2>&1 &
     echo $! > "${LOG_DIR}/admin-dev.pid"
+    sleep 2
+    log_info "管理后台已启动: http://localhost:5173"
+}
 
-    # 启动小程序 (开发模式)
-    log_info "启动小程序 (开发模式)..."
+start_dev_miniapp() {
+    mkdir -p "${LOG_DIR}"
+    install_deps "${MINIAPP_DIR}" "小程序"
+
+    # 检查是否已运行
+    if [ -f "${LOG_DIR}/miniapp-dev.pid" ]; then
+        local pid=$(cat "${LOG_DIR}/miniapp-dev.pid")
+        if kill -0 "$pid" 2>/dev/null; then
+            log_warn "小程序编译已在运行 (PID: $pid)"
+            return 0
+        fi
+    fi
+
+    log_info "启动小程序编译 (微信)..."
     cd "${MINIAPP_DIR}"
     npm run dev:weapp > "${LOG_DIR}/miniapp-dev.log" 2>&1 &
     echo $! > "${LOG_DIR}/miniapp-dev.pid"
+    sleep 2
+    log_info "小程序编译已启动，请用微信开发者工具打开 dist 目录"
+}
 
+start_dev_h5() {
+    mkdir -p "${LOG_DIR}"
+    install_deps "${MINIAPP_DIR}" "H5前端"
+
+    # 检查是否已运行
+    if [ -f "${LOG_DIR}/h5-dev.pid" ]; then
+        local pid=$(cat "${LOG_DIR}/h5-dev.pid")
+        if kill -0 "$pid" 2>/dev/null; then
+            log_warn "H5服务已在运行 (PID: $pid)"
+            return 0
+        fi
+    fi
+
+    log_info "启动 H5 前端..."
+    cd "${MINIAPP_DIR}"
+    npm run dev:h5 > "${LOG_DIR}/h5-dev.log" 2>&1 &
+    echo $! > "${LOG_DIR}/h5-dev.pid"
     sleep 3
+    log_info "H5 前端已启动: http://localhost:10086"
+}
 
+print_dev_urls() {
     echo ""
-    log_info "开发环境已启动 ✓"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}  服务地址:${NC}"
+    echo -e "    后端 API:     http://localhost:${API_PORT}"
+    echo -e "    管理后台:     http://localhost:5173"
+    echo -e "    H5 前端:      http://localhost:10086 (如已启动)"
+    echo -e "    小程序:       使用微信开发者工具打开 dist 目录"
     echo ""
-    echo -e "  ${GREEN}后端服务:${NC}     http://localhost:${API_PORT}"
-    echo -e "  ${GREEN}管理后台:${NC}     http://localhost:5173"
-    echo -e "  ${GREEN}小程序:${NC}       请使用微信开发者工具打开 dist 目录"
-    echo ""
-    echo -e "  ${YELLOW}日志目录:${NC}     ${LOG_DIR}"
+    echo -e "${YELLOW}  日志文件:${NC}"
+    echo -e "    后端:         ${LOG_DIR}/server-dev.log"
+    echo -e "    管理后台:     ${LOG_DIR}/admin-dev.log"
+    echo -e "    小程序:       ${LOG_DIR}/miniapp-dev.log"
+    echo -e "    H5:           ${LOG_DIR}/h5-dev.log"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
     echo ""
 }
 
 stop_dev() {
     log_step "停止开发环境..."
 
-    for pid_file in "${LOG_DIR}"/*-dev.pid; do
+    # 停止所有 pid 文件记录的进程
+    for pid_file in "${LOG_DIR}"/*.pid; do
         if [ -f "$pid_file" ]; then
             pid=$(cat "$pid_file")
+            name=$(basename "$pid_file" .pid)
             if kill -0 "$pid" 2>/dev/null; then
                 kill "$pid" 2>/dev/null || true
-                log_info "已停止进程 $pid"
+                log_info "已停止 ${name} (PID: $pid)"
             fi
             rm -f "$pid_file"
         fi
@@ -1117,23 +1205,27 @@ main() {
 
     while true; do
         print_menu
-        read -p "请输入选项 [0-14]: " choice
+        read -p "请输入选项 [0-18]: " choice
 
         case $choice in
-            1) start_dev ;;
-            2) stop_dev ;;
-            3) deploy_production ;;
-            4) restart_production ;;
-            5) stop_production ;;
-            6) show_status ;;
-            7) show_logs ;;
-            8) health_check ;;
-            9) backup_database ;;
-            10) restore_database ;;
-            11) init_environment ;;
-            12) update_ssl ;;
-            13) clean_logs ;;
-            14) docker_menu ;;
+            1) start_dev_all ;;
+            2) start_dev_server ;;
+            3) start_dev_admin ;;
+            4) start_dev_miniapp ;;
+            5) start_dev_h5 ;;
+            6) stop_dev ;;
+            7) deploy_production ;;
+            8) restart_production ;;
+            9) stop_production ;;
+            10) show_status ;;
+            11) show_logs ;;
+            12) health_check ;;
+            13) backup_database ;;
+            14) restore_database ;;
+            15) init_environment ;;
+            16) update_ssl ;;
+            17) clean_logs ;;
+            18) docker_menu ;;
             0)
                 echo ""
                 log_info "再见！"
@@ -1152,7 +1244,11 @@ main() {
 # 支持命令行参数
 if [ $# -gt 0 ]; then
     case $1 in
-        dev) start_dev ;;
+        dev) start_dev_all ;;
+        dev:server) start_dev_server ;;
+        dev:admin) start_dev_admin ;;
+        dev:miniapp) start_dev_miniapp ;;
+        dev:h5) start_dev_h5 ;;
         dev:stop) stop_dev ;;
         deploy) deploy_production ;;
         restart) restart_production ;;
@@ -1169,12 +1265,20 @@ if [ $# -gt 0 ]; then
         help|--help|-h)
             echo "用法: $0 [命令]"
             echo ""
-            echo "命令:"
-            echo "  dev          启动开发环境"
+            echo "开发环境命令:"
+            echo "  dev          启动全部开发服务"
+            echo "  dev:server   仅启动后端 API"
+            echo "  dev:admin    仅启动管理后台"
+            echo "  dev:miniapp  启动小程序编译"
+            echo "  dev:h5       启动 H5 前端"
             echo "  dev:stop     停止开发环境"
-            echo "  deploy       部署生产环境"
+            echo ""
+            echo "生产环境命令:"
+            echo "  deploy       部署生产环境 (零停机)"
             echo "  restart      重启生产服务"
             echo "  stop         停止生产服务"
+            echo ""
+            echo "管理命令:"
             echo "  status       查看服务状态"
             echo "  logs         查看日志"
             echo "  health       健康检查"
