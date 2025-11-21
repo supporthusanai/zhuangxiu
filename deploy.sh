@@ -230,6 +230,7 @@ start_dev_all() {
     start_dev_server
     start_dev_admin
     start_dev_miniapp
+    start_dev_h5
 
     echo ""
     log_info "全部开发服务已启动 ✓"
@@ -326,7 +327,7 @@ print_dev_urls() {
     echo -e "${GREEN}  服务地址:${NC}"
     echo -e "    后端 API:     http://localhost:${API_PORT}"
     echo -e "    管理后台:     http://localhost:3001"
-    echo -e "    H5 前端:      http://localhost:10086 (如已启动)"
+    echo -e "    H5 前端:      http://localhost:10086"
     echo -e "    小程序:       使用微信开发者工具打开 dist 目录"
     echo ""
     echo -e "${YELLOW}  日志文件:${NC}"
