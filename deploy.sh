@@ -72,9 +72,10 @@ print_menu() {
     echo ""
     echo -e "  ${RED}[系统管理]${NC}"
     echo "   15) 初始化环境"
-    echo "   16) 更新SSL证书"
-    echo "   17) 清理日志"
-    echo "   18) Docker Compose 管理"
+    echo "   16) 项目初始化向导（安装依赖、创建管理员）"
+    echo "   17) 更新SSL证书"
+    echo "   18) 清理日志"
+    echo "   19) Docker Compose 管理"
     echo ""
     echo "    0) 退出"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -844,6 +845,218 @@ init_prod_env() {
     echo "  - /etc/nginx/sites-available/${PROJECT_NAME}"
 }
 
+# 项目初始化向导（包含创建管理员）
+init_project() {
+    log_step "项目初始化向导"
+    echo ""
+
+    # 1. 检查环境
+    log_info "检查环境依赖..."
+    check_command "node" || { log_error "请先安装 Node.js"; return 1; }
+    check_command "npm" || { log_error "请先安装 npm"; return 1; }
+
+    local node_version=$(node -v | sed 's/v//' | cut -d. -f1)
+    if [ "$node_version" -lt 16 ]; then
+        log_error "Node.js 版本过低，需要 16+"
+        return 1
+    fi
+    log_info "Node.js 版本: $(node -v) ✓"
+
+    # 2. 创建环境配置
+    log_step "配置环境变量..."
+    if [ ! -f "${SERVER_DIR}/.env" ]; then
+        if [ -f "${SERVER_DIR}/.env.example" ]; then
+            cp "${SERVER_DIR}/.env.example" "${SERVER_DIR}/.env"
+            log_info "已从 .env.example 创建 server/.env"
+        else
+            log_info "创建默认 .env 配置..."
+            cat > "${SERVER_DIR}/.env" << 'ENVEOF'
+# 服务器配置
+NODE_ENV=development
+PORT=3000
+
+# 数据库配置
+MONGODB_URI=mongodb://localhost:27017/zhuangxiu
+
+# Redis配置
+REDIS_URL=redis://localhost:6379
+
+# JWT配置
+JWT_SECRET=your-secret-key-change-in-production
+JWT_EXPIRES_IN=7d
+
+# 微信小程序配置（需要填写）
+WECHAT_APPID=
+WECHAT_SECRET=
+
+# 短信服务配置（需要填写）
+SMS_ACCESS_KEY_ID=
+SMS_ACCESS_KEY_SECRET=
+SMS_SIGN_NAME=
+SMS_TEMPLATE_CODE=
+
+# 文件上传配置
+UPLOAD_DIR=uploads
+MAX_FILE_SIZE=10485760
+ENVEOF
+            log_info "已创建 server/.env 配置文件"
+        fi
+    else
+        log_info "server/.env 已存在，跳过"
+    fi
+
+    # 3. 安装依赖
+    if confirm "是否安装所有项目依赖?"; then
+        log_step "安装项目依赖..."
+
+        if [ -d "${SERVER_DIR}" ]; then
+            log_info "安装 server 依赖..."
+            cd "${SERVER_DIR}" && npm install
+        fi
+
+        if [ -d "${WEB_DIR}" ]; then
+            log_info "安装 web 依赖..."
+            cd "${WEB_DIR}" && npm install
+        fi
+
+        if [ -d "${ADMIN_DIR}" ]; then
+            log_info "安装 admin 依赖..."
+            cd "${ADMIN_DIR}" && npm install
+        fi
+
+        if [ -d "${MINIAPP_DIR}" ] && [ -f "${MINIAPP_DIR}/package.json" ]; then
+            log_info "安装 miniapp 依赖..."
+            cd "${MINIAPP_DIR}" && npm install
+        fi
+
+        log_info "依赖安装完成 ✓"
+    fi
+
+    # 4. 创建管理员
+    if confirm "是否创建默认管理员账号?"; then
+        create_admin_user
+    fi
+
+    # 5. 完成
+    echo ""
+    echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
+    log_info "项目初始化完成！"
+    echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo "启动开发服务器:"
+    echo "  ./deploy.sh dev        - 启动后端API服务器"
+    echo "  ./deploy.sh dev:admin  - 启动管理后台"
+    echo "  ./deploy.sh dev:web    - 启动PC用户端"
+    echo "  ./deploy.sh dev:mini   - 启动小程序开发"
+    echo ""
+    echo "端口分配:"
+    echo "  API服务器:    http://localhost:3000"
+    echo "  管理后台:     http://localhost:3001"
+    echo "  PC用户端:     http://localhost:5000"
+    echo ""
+}
+
+# 创建管理员账号
+create_admin_user() {
+    log_step "创建管理员账号..."
+
+    read -p "管理员手机号 (默认: 13800000000): " admin_phone
+    admin_phone=${admin_phone:-13800000000}
+
+    read -p "管理员密码 (默认: admin123): " admin_password
+    admin_password=${admin_password:-admin123}
+
+    read -p "管理员昵称 (默认: 系统管理员): " admin_nickname
+    admin_nickname=${admin_nickname:-系统管理员}
+
+    # 创建初始化脚本
+    mkdir -p "${SERVER_DIR}/scripts"
+    cat > "${SERVER_DIR}/scripts/initAdmin.js" << ADMINEOF
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+
+const adminConfig = {
+  phone: '${admin_phone}',
+  password: '${admin_password}',
+  nickname: '${admin_nickname}'
+};
+
+const UserSchema = new mongoose.Schema({
+  nickname: { type: String, required: true, trim: true },
+  avatar: { type: String, default: '' },
+  phone: { type: String, unique: true, sparse: true },
+  openid: { type: String, unique: true, sparse: true },
+  password: { type: String, select: false },
+  gender: { type: String, enum: ['male', 'female', 'unknown'], default: 'unknown' },
+  region: { type: String, default: '' },
+  signature: { type: String, default: '' },
+  role: { type: String, enum: ['user', 'merchant', 'admin'], default: 'user' },
+  merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant' },
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
+
+UserSchema.pre('save', async function(next) {
+  if (!this.isModified('password') || !this.password) return next();
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+const User = mongoose.model('User', UserSchema);
+
+async function initAdmin() {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('数据库连接成功');
+
+    const existingAdmin = await User.findOne({ phone: adminConfig.phone });
+    if (existingAdmin) {
+      console.log('管理员账号已存在，更新权限...');
+      existingAdmin.role = 'admin';
+      await existingAdmin.save();
+    } else {
+      await User.create({
+        phone: adminConfig.phone,
+        password: adminConfig.password,
+        nickname: adminConfig.nickname,
+        role: 'admin',
+        isActive: true,
+      });
+      console.log('管理员账号创建成功');
+    }
+
+    console.log('管理员信息:');
+    console.log('  手机号:', adminConfig.phone);
+    console.log('  密码:', adminConfig.password);
+
+    await mongoose.disconnect();
+    process.exit(0);
+  } catch (error) {
+    console.error('初始化失败:', error.message);
+    process.exit(1);
+  }
+}
+
+initAdmin();
+ADMINEOF
+
+    log_info "已创建管理员初始化脚本"
+
+    if confirm "是否现在执行初始化? (需要MongoDB服务运行)"; then
+        log_info "执行管理员初始化..."
+        cd "${SERVER_DIR}"
+        if node scripts/initAdmin.js; then
+            log_info "管理员初始化完成 ✓"
+        else
+            log_error "管理员初始化失败，请确保MongoDB服务已启动"
+            log_info "稍后可手动运行: cd server && node scripts/initAdmin.js"
+        fi
+    else
+        log_info "稍后可运行: cd server && node scripts/initAdmin.js"
+    fi
+}
+
 create_pm2_config() {
     log_info "创建 PM2 配置..."
 
@@ -1353,7 +1566,7 @@ main() {
 
     while true; do
         print_menu
-        read -p "请输入选项 [0-18]: " choice
+        read -p "请输入选项 [0-19]: " choice
 
         case $choice in
             1) start_dev_all ;;
@@ -1371,9 +1584,10 @@ main() {
             13) backup_database ;;
             14) restore_database ;;
             15) init_environment ;;
-            16) update_ssl ;;
-            17) clean_logs ;;
-            18) docker_menu ;;
+            16) init_project ;;
+            17) update_ssl ;;
+            18) clean_logs ;;
+            19) docker_menu ;;
             0)
                 echo ""
                 log_info "再见！"
@@ -1407,7 +1621,7 @@ if [ $# -gt 0 ]; then
         backup) backup_database ;;
         restore) restore_database ;;
         init) init_environment ;;
-        init:project) node "${PROJECT_DIR}/scripts/init.js" ;;
+        init:project) init_project ;;
         ssl) update_ssl ;;
         clean) clean_logs ;;
         docker) docker_menu ;;
