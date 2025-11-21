@@ -42,6 +42,8 @@
   },
   "devDependencies": {
     "@babel/core": "^7.8.0",
+    "@babel/preset-react": "^7.24.0",
+    "@babel/preset-typescript": "^7.24.0",
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",
     "react-refresh": "^0.14.2",
     "@tarojs/cli": "4.1.8",
