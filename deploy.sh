@@ -426,7 +426,7 @@ start_dev_web() {
     npm run dev > "${LOG_DIR}/web-dev.log" 2>&1 &
     echo $! > "${LOG_DIR}/web-dev.pid"
     sleep 3
-    log_info "PC 端网站已启动: http://localhost:3000"
+    log_info "PC 端网站已启动: http://localhost:5000"
 }
 
 print_dev_urls() {
@@ -435,7 +435,7 @@ print_dev_urls() {
     echo -e "${GREEN}  服务地址:${NC}"
     echo -e "    后端 API:     http://localhost:${API_PORT}"
     echo -e "    管理后台:     http://localhost:3001"
-    echo -e "    PC端网站:     http://localhost:3000"
+    echo -e "    PC端网站:     http://localhost:5000"
     echo -e "    小程序:       使用微信开发者工具打开 dist 目录"
     echo ""
     echo -e "${YELLOW}  日志文件:${NC}"
