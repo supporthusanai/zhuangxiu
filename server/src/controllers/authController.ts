@@ -4,13 +4,29 @@ import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { wechatLogin as wechatLoginApi, getPhoneNumber } from '../utils/wechat';
+import { sendSmsCode, verifySmsCode, validatePhone } from '../utils/sms';
+import logger from '../config/logger';
+
+// 获取 JWT 密钥（生产环境必须配置）
+const getJwtSecret = (): string => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret === 'secret') {
+    if (process.env.NODE_ENV === 'production') {
+      logger.error('JWT_SECRET 未配置或使用了默认值，生产环境不允许启动！');
+      throw new Error('JWT_SECRET must be configured in production');
+    }
+    logger.warn('警告：JWT_SECRET 使用了默认值，仅限开发环境使用！');
+    return 'dev-secret-change-in-production';
+  }
+  return secret;
+};
 
 // 生成 JWT Token
 const generateToken = (userId: string): string => {
   const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
   return jwt.sign(
     { userId },
-    process.env.JWT_SECRET || 'secret',
+    getJwtSecret(),
     { expiresIn } as jwt.SignOptions
   );
 };
@@ -84,6 +100,40 @@ export const wechatLogin = async (
   }
 };
 
+// 发送短信验证码
+export const sendVerifyCode = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      throw new AppError('手机号不能为空', 400);
+    }
+
+    if (!validatePhone(phone)) {
+      throw new AppError('手机号格式不正确', 400);
+    }
+
+    const result = await sendSmsCode(phone);
+
+    if (!result.success) {
+      throw new AppError(result.message, 400);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '发送验证码失败',
+    });
+  }
+};
+
 // 手机号登录
 export const phoneLogin = async (
   req: AuthRequest,
@@ -96,8 +146,15 @@ export const phoneLogin = async (
       throw new AppError('手机号和验证码不能为空', 400);
     }
 
-    // TODO: 验证短信验证码
-    // 这里简单模拟验证通过
+    if (!validatePhone(phone)) {
+      throw new AppError('手机号格式不正确', 400);
+    }
+
+    // 验证短信验证码
+    const isValid = await verifySmsCode(phone, code);
+    if (!isValid) {
+      throw new AppError('验证码错误或已过期', 400);
+    }
 
     // 查找或创建用户
     let user = await User.findOne({ phone });

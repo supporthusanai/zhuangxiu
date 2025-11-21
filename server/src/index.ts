@@ -23,11 +23,26 @@ const app: Application = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 3000;
 
+// CORS 配置
+const getCorsOrigin = (): string | string[] | boolean => {
+  const origins = process.env.ALLOWED_ORIGINS;
+  if (process.env.NODE_ENV === 'production') {
+    if (!origins) {
+      logger.warn('警告：生产环境未配置 ALLOWED_ORIGINS，将拒绝所有跨域请求');
+      return false;
+    }
+    return origins.split(',').map(o => o.trim());
+  }
+  return origins ? origins.split(',').map(o => o.trim()) : true;
+};
+
 // 中间件
 app.use(helmet()); // 安全头
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+  origin: getCorsOrigin(),
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(compression()); // 响应压缩
 app.use(morgan(

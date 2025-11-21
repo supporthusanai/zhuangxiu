@@ -24,6 +24,18 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// 短信验证码接口的速率限制（非常严格，防止滥用）
+export const smsLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1分钟
+  max: 1, // 每个IP每分钟最多发送1条
+  message: {
+    success: false,
+    message: '验证码发送过于频繁，请稍后再试',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // 上传接口的速率限制
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1小时
