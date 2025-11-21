@@ -170,6 +170,11 @@ export const uploadImage = (filePath: string) => {
 
 // ============ 商家相关 ============
 
+// 获取商家详情（公开）
+export const getMerchantDetail = (id: string) => {
+  return get(`/merchants/${id}`);
+};
+
 // 申请成为商家
 export const applyMerchant = (data: {
   companyName: string;

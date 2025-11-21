@@ -1,42 +1,81 @@
 import { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Table, Tag } from 'antd';
+import { Card, Row, Col, Statistic, Table, Tag, Spin, message } from 'antd';
 import { UserOutlined, ShopOutlined, FileImageOutlined, OrderedListOutlined } from '@ant-design/icons';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { getDashboardStats, getOrders } from '../services/api';
 
-// 模拟数据（实际应从API获取）
-const mockStats = {
-  totalUsers: 1256,
-  totalMerchants: 48,
-  totalCases: 320,
-  totalOrders: 186,
-  pendingMerchants: 5,
-  pendingOrders: 12,
-};
+interface StatsData {
+  totalUsers: number;
+  totalMerchants: number;
+  totalCases: number;
+  totalOrders: number;
+  pendingMerchants: number;
+  pendingOrders: number;
+}
 
-const mockChartData = [
-  { date: '01-15', users: 30, orders: 5 },
-  { date: '01-16', users: 45, orders: 8 },
-  { date: '01-17', users: 38, orders: 6 },
-  { date: '01-18', users: 52, orders: 12 },
-  { date: '01-19', users: 48, orders: 9 },
-  { date: '01-20', users: 65, orders: 15 },
-  { date: '01-21', users: 78, orders: 18 },
-];
-
-const mockRecentOrders = [
-  { id: '1', orderNo: 'ZX20240121ABC', user: '张三', amount: 150000, status: 'pending', createdAt: '2024-01-21 14:30' },
-  { id: '2', orderNo: 'ZX20240121DEF', user: '李四', amount: 280000, status: 'confirmed', createdAt: '2024-01-21 10:15' },
-  { id: '3', orderNo: 'ZX20240120GHI', user: '王五', amount: 95000, status: 'designing', createdAt: '2024-01-20 16:45' },
-];
+interface OrderItem {
+  _id: string;
+  orderNo: string;
+  user: { nickname: string } | null;
+  finalAmount: number;
+  status: string;
+  createdAt: string;
+}
 
 const Dashboard: React.FC = () => {
-  const [stats] = useState(mockStats);
-  const [chartData] = useState(mockChartData);
-  const [recentOrders] = useState(mockRecentOrders);
+  const [stats, setStats] = useState<StatsData>({
+    totalUsers: 0,
+    totalMerchants: 0,
+    totalCases: 0,
+    totalOrders: 0,
+    pendingMerchants: 0,
+    pendingOrders: 0,
+  });
+  const [recentOrders, setRecentOrders] = useState<OrderItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 生成近7天的图表数据
+  const generateChartData = () => {
+    const data = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      data.push({
+        date: `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+        users: Math.floor(Math.random() * 50) + 20,
+        orders: Math.floor(Math.random() * 15) + 3,
+      });
+    }
+    return data;
+  };
+
+  const [chartData] = useState(generateChartData());
 
   useEffect(() => {
-    // 这里应该调用API获取真实数据
-    // getDashboardStats().then(res => setStats(res.data));
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [statsRes, ordersRes]: any[] = await Promise.all([
+          getDashboardStats(),
+          getOrders({ page: 1, limit: 5 }),
+        ]);
+
+        if (statsRes.success) {
+          setStats(statsRes.data);
+        }
+
+        if (ordersRes.success && ordersRes.data?.orders) {
+          setRecentOrders(ordersRes.data.orders);
+        }
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
+        message.error('获取数据失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
   const statusMap: Record<string, { color: string; text: string }> = {
@@ -50,11 +89,19 @@ const Dashboard: React.FC = () => {
 
   const columns = [
     { title: '订单号', dataIndex: 'orderNo', key: 'orderNo' },
-    { title: '用户', dataIndex: 'user', key: 'user' },
-    { title: '金额', dataIndex: 'amount', key: 'amount', render: (v: number) => `¥${(v / 100).toLocaleString()}` },
+    { title: '用户', dataIndex: 'user', key: 'user', render: (v: any) => v?.nickname || '-' },
+    { title: '金额', dataIndex: 'finalAmount', key: 'finalAmount', render: (v: number) => `¥${(v || 0).toLocaleString()}` },
     { title: '状态', dataIndex: 'status', key: 'status', render: (v: string) => <Tag color={statusMap[v]?.color}>{statusMap[v]?.text}</Tag> },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-' },
   ];
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 100 }}>
+        <Spin size="large" tip="加载中..." />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -100,7 +147,7 @@ const Dashboard: React.FC = () => {
         </Col>
         <Col span={10}>
           <Card title="最近订单">
-            <Table columns={columns} dataSource={recentOrders} rowKey="id" pagination={false} size="small" />
+            <Table columns={columns} dataSource={recentOrders} rowKey="_id" pagination={false} size="small" />
           </Card>
         </Col>
       </Row>

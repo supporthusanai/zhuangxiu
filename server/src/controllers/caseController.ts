@@ -12,7 +12,7 @@ export const getCases = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { style, minArea, maxArea, minPrice, maxPrice, order = 'desc' } = req.query;
+    const { style, minArea, maxArea, minPrice, maxPrice, order = 'desc', merchantId } = req.query;
     const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
     const allowedSortFields = ['createdAt', 'viewCount', 'favoriteCount', 'price', 'area'];
     const sortField = validateSortField(req.query.sort as string, allowedSortFields);
@@ -20,6 +20,7 @@ export const getCases = async (
     // 构建查询条件
     const query: any = { status: 'published' };
 
+    if (merchantId) query.merchant = merchantId;
     if (style) query.style = style;
     if (minArea || maxArea) {
       query.area = {};

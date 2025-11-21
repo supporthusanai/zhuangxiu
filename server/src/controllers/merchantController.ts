@@ -128,6 +128,50 @@ export const updateMerchant = async (
   }
 };
 
+// 获取商家详情（公开）
+export const getMerchantById = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const merchant = await Merchant.findById(id)
+      .select('-businessLicense -rejectionReason')
+      .populate('user', 'nickname avatar');
+
+    if (!merchant) {
+      throw new AppError('商家不存在', 404);
+    }
+
+    // 只返回审核通过的商家
+    if (merchant.status !== 'approved') {
+      throw new AppError('商家信息不可用', 404);
+    }
+
+    // 获取该商家的设计师
+    const designers = await Designer.find({ merchant: merchant._id });
+
+    // 获取该商家的案例数
+    const Case = require('../models/Case').default;
+    const caseCount = await Case.countDocuments({ merchant: merchant._id, status: 'approved' });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...merchant.toObject(),
+        designers,
+        caseCount,
+      },
+    });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '获取商家详情失败',
+    });
+  }
+};
+
 // 获取商家列表（管理员）
 export const getMerchants = async (
   req: AuthRequest,
