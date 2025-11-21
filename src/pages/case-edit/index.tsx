@@ -1,4 +1,4 @@
-import { View, Text, Input, Picker, Button, Image } from '@tarojs/components'
+import { View, Text, Input, Picker, Button, Image, Textarea } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useState, useEffect } from 'react'
 import './index.scss'
@@ -269,7 +269,7 @@ export default function CaseEdit() {
         {/* 设计说明 */}
         <View className='form-section'>
           <View className='section-title'>设计说明</View>
-          <textarea
+          <Textarea
             className='textarea-field'
             placeholder='请详细描述设计理念、材料选择、空间布局等'
             maxlength={1000}

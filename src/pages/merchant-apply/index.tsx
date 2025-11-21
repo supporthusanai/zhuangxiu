@@ -1,4 +1,4 @@
-import { View, Text, Input, Picker, Button } from '@tarojs/components'
+import { View, Text, Input, Picker, Button, Textarea } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useState } from 'react'
 import { getUserInfo } from '@/utils/user'
@@ -274,7 +274,7 @@ export default function MerchantApply() {
         {/* 公司简介 */}
         <View className='form-section'>
           <View className='section-title'>公司简介</View>
-          <textarea
+          <Textarea
             className='textarea-field'
             placeholder='请简要介绍您的公司业务、优势等（选填）'
             maxlength={500}

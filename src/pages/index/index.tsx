@@ -1,13 +1,21 @@
 import { View, Text, Image, Swiper, SwiperItem } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { useState, useEffect } from 'react'
-import { getRecommendedCases, analyzeUserPreference } from '@/utils/recommendation'
+import { useState, useEffect, useCallback } from 'react'
+import { getHotCases, getCases } from '@/services/api'
 import './index.scss'
 
-interface BannerItem {
-  id: number
-  image: string
+interface CaseItem {
+  _id: string
   title: string
+  style: string
+  area: number
+  price: number
+  images: string[]
+  designer?: {
+    name: string
+    avatar: string
+    title: string
+  }
 }
 
 interface ServiceItem {
@@ -17,124 +25,143 @@ interface ServiceItem {
   desc: string
 }
 
-export default function Index() {
-  // 轮播图数据
-  const [banners] = useState<BannerItem[]>([
-    { id: 1, image: 'https://via.placeholder.com/750x400/667eea/ffffff?text=精品案例1', title: '现代简约风格' },
-    { id: 2, image: 'https://via.placeholder.com/750x400/764ba2/ffffff?text=精品案例2', title: '北欧风格' },
-    { id: 3, image: 'https://via.placeholder.com/750x400/f093fb/ffffff?text=精品案例3', title: '新中式风格' }
-  ])
+// 默认占位图
+const DEFAULT_IMAGE = 'https://via.placeholder.com/340x240/667eea/ffffff?text=装修案例'
 
-  // 服务项目
-  const [services] = useState<ServiceItem[]>([
+export default function Index() {
+  // 状态
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [hotCases, setHotCases] = useState<CaseItem[]>([])
+  const [latestCases, setLatestCases] = useState<CaseItem[]>([])
+
+  // 服务项目（静态数据）
+  const services: ServiceItem[] = [
     { id: 1, icon: '🏠', name: '整屋设计', desc: '全屋定制设计方案' },
     { id: 2, icon: '🎨', name: '软装搭配', desc: '专业软装设计师' },
     { id: 3, icon: '🔨', name: '装修施工', desc: '标准化施工管理' },
     { id: 4, icon: '📐', name: '免费量房', desc: '专业设计师上门' }
-  ])
-
-  // 推荐案例
-  const [recommendedCases, setRecommendedCases] = useState<any[]>([])
-  const [hasPreference, setHasPreference] = useState(false)
-
-  // 所有案例数据
-  const allCases = [
-    {
-      id: 1,
-      title: '现代简约风格三居室',
-      style: '现代简约',
-      area: '120㎡',
-      price: '15万',
-      image: 'https://via.placeholder.com/340x240/667eea/ffffff?text=现代简约'
-    },
-    {
-      id: 2,
-      title: '北欧风格小户型',
-      style: '北欧风格',
-      area: '80㎡',
-      price: '10万',
-      image: 'https://via.placeholder.com/340x240/764ba2/ffffff?text=北欧风格'
-    },
-    {
-      id: 3,
-      title: '中式古典别墅',
-      style: '中式风格',
-      area: '300㎡',
-      price: '50万',
-      image: 'https://via.placeholder.com/340x240/52c41a/ffffff?text=中式古典'
-    },
-    {
-      id: 4,
-      title: '工业风格loft',
-      style: '工业风格',
-      area: '150㎡',
-      price: '20万',
-      image: 'https://via.placeholder.com/340x240/faad14/ffffff?text=工业风格'
-    },
-    {
-      id: 5,
-      title: '地中海风格复式',
-      style: '地中海',
-      area: '200㎡',
-      price: '30万',
-      image: 'https://via.placeholder.com/340x240/1890ff/ffffff?text=地中海'
-    }
   ]
 
-  useEffect(() => {
-    loadRecommendations()
+  // 加载数据
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      // 并行请求热门案例和最新案例
+      const [hotRes, latestRes] = await Promise.all([
+        getHotCases(4).catch(() => ({ success: false, data: [] })),
+        getCases({ limit: 4, sort: 'createdAt', order: 'desc' }).catch(() => ({
+          success: false,
+          data: { cases: [] }
+        }))
+      ])
+
+      if (hotRes.success && hotRes.data) {
+        setHotCases(Array.isArray(hotRes.data) ? hotRes.data : [])
+      }
+
+      if (latestRes.success && latestRes.data?.cases) {
+        setLatestCases(latestRes.data.cases)
+      }
+    } catch (err) {
+      console.error('加载数据失败:', err)
+      setError('加载失败，请下拉刷新重试')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  const loadRecommendations = () => {
-    const preference = analyzeUserPreference()
-    const hasData = preference.favoriteStyles.length > 0 || preference.browseHistory.length > 0
-    setHasPreference(hasData)
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
-    const recommended = getRecommendedCases(allCases, 4)
-    setRecommendedCases(recommended)
+  // 下拉刷新
+  Taro.usePullDownRefresh(() => {
+    loadData().finally(() => {
+      Taro.stopPullDownRefresh()
+    })
+  })
+
+  // 获取案例图片
+  const getCaseImage = (caseItem: CaseItem): string => {
+    return caseItem.images?.[0] || DEFAULT_IMAGE
   }
 
-  // 跳转到案例页面
+  // 格式化价格
+  const formatPrice = (price: number): string => {
+    if (price >= 10000) {
+      return `${(price / 10000).toFixed(0)}万`
+    }
+    return `${price}元`
+  }
+
+  // 导航函数
   const navigateToCases = () => {
-    Taro.switchTab({
-      url: '/pages/cases/index'
-    })
+    Taro.switchTab({ url: '/pages/cases/index' })
   }
 
-  // 跳转到设计师页面
   const navigateToDesigners = () => {
-    Taro.switchTab({
-      url: '/pages/designers/index'
-    })
+    Taro.switchTab({ url: '/pages/designers/index' })
   }
 
-  // 预约咨询
   const handleConsult = () => {
-    Taro.navigateTo({
-      url: '/pages/chat/index?type=consult'
-    })
+    Taro.navigateTo({ url: '/pages/chat/index?type=consult' })
   }
 
-  // 跳转到案例详情
-  const navigateToCaseDetail = (caseId: number) => {
-    Taro.navigateTo({
-      url: `/pages/case-detail/index?id=${caseId}`
-    })
+  const navigateToCaseDetail = (caseId: string) => {
+    Taro.navigateTo({ url: `/pages/case-detail/index?id=${caseId}` })
   }
 
-  // 跳转到设计师详情
-  const navigateToDesignerDetail = (designerId: number) => {
-    Taro.navigateTo({
-      url: `/pages/designer-detail/index?id=${designerId}`
-    })
-  }
-
-  // 跳转到搜索页面
   const navigateToSearch = () => {
-    Taro.navigateTo({
-      url: '/pages/search/index'
-    })
+    Taro.navigateTo({ url: '/pages/search/index' })
   }
+
+  // 渲染案例卡片
+  const renderCaseCard = (caseItem: CaseItem) => (
+    <View
+      key={caseItem._id}
+      className='case-card'
+      onClick={() => navigateToCaseDetail(caseItem._id)}
+    >
+      <Image
+        src={getCaseImage(caseItem)}
+        className='case-image'
+        mode='aspectFill'
+        lazyLoad
+      />
+      <View className='case-info'>
+        <View className='case-title'>{caseItem.title}</View>
+        <View className='case-tags'>
+          <Text className='tag'>{caseItem.area}㎡</Text>
+          <Text className='tag'>{formatPrice(caseItem.price)}</Text>
+        </View>
+      </View>
+    </View>
+  )
+
+  // 渲染加载状态
+  const renderLoading = () => (
+    <View className='loading-container'>
+      <Text className='loading-text'>加载中...</Text>
+    </View>
+  )
+
+  // 渲染错误状态
+  const renderError = () => (
+    <View className='error-container' onClick={loadData}>
+      <Text className='error-text'>{error}</Text>
+      <Text className='retry-text'>点击重试</Text>
+    </View>
+  )
+
+  // 渲染空状态
+  const renderEmpty = () => (
+    <View className='empty-container'>
+      <Text className='empty-text'>暂无数据</Text>
+    </View>
+  )
 
   return (
     <View className='index-page'>
@@ -146,7 +173,7 @@ export default function Index() {
         </View>
       </View>
 
-      {/* 轮播图 */}
+      {/* 轮播图 - 使用热门案例 */}
       <View className='banner-section'>
         <Swiper
           className='banner-swiper'
@@ -156,10 +183,16 @@ export default function Index() {
           indicatorDots
           autoplay
         >
-          {banners.map(banner => (
-            <SwiperItem key={banner.id}>
-              <Image src={banner.image} className='banner-image' mode='aspectFill' />
-              <View className='banner-title'>{banner.title}</View>
+          {(hotCases.length > 0 ? hotCases.slice(0, 3) : [
+            { _id: '1', title: '精品案例', images: [DEFAULT_IMAGE] }
+          ]).map((caseItem, index) => (
+            <SwiperItem key={caseItem._id || index} onClick={() => caseItem._id && navigateToCaseDetail(caseItem._id)}>
+              <Image
+                src={getCaseImage(caseItem as CaseItem)}
+                className='banner-image'
+                mode='aspectFill'
+              />
+              <View className='banner-title'>{caseItem.title || '精品案例'}</View>
             </SwiperItem>
           ))}
         </Swiper>
@@ -179,81 +212,40 @@ export default function Index() {
         </View>
       </View>
 
-      {/* 智能推荐 */}
-      {recommendedCases.length > 0 && (
-        <View className='recommendations-section'>
-          <View className='section-header'>
-            <View className='section-title-wrapper'>
-              <Text className='section-title'>
-                {hasPreference ? '✨ 为你推荐' : '🔥 热门推荐'}
-              </Text>
-              {hasPreference && (
-                <Text className='section-subtitle'>根据你的喜好精选</Text>
-              )}
-            </View>
-            <Text className='more-link' onClick={navigateToCases}>查看更多 →</Text>
+      {/* 热门推荐 */}
+      <View className='recommendations-section'>
+        <View className='section-header'>
+          <View className='section-title-wrapper'>
+            <Text className='section-title'>🔥 热门推荐</Text>
           </View>
-          <View className='cases-preview'>
-            {recommendedCases.slice(0, 2).map(caseItem => (
-              <View
-                key={caseItem.id}
-                className='case-card'
-                onClick={() => navigateToCaseDetail(caseItem.id)}
-              >
-                <Image
-                  src={caseItem.image}
-                  className='case-image'
-                  mode='aspectFill'
-                />
-                <View className='case-info'>
-                  <View className='case-title'>{caseItem.title}</View>
-                  <View className='case-tags'>
-                    <Text className='tag'>{caseItem.area}</Text>
-                    <Text className='tag'>{caseItem.price}</Text>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
+          <Text className='more-link' onClick={navigateToCases}>查看更多 →</Text>
         </View>
-      )}
 
-      {/* 精品案例 */}
+        {loading ? renderLoading() : error ? renderError() : (
+          <View className='cases-preview'>
+            {hotCases.length > 0
+              ? hotCases.slice(0, 2).map(renderCaseCard)
+              : renderEmpty()
+            }
+          </View>
+        )}
+      </View>
+
+      {/* 最新案例 */}
       <View className='cases-section'>
         <View className='section-header'>
           <View className='section-title'>精品案例</View>
           <Text className='more-link' onClick={navigateToCases}>查看更多 →</Text>
         </View>
-        <View className='cases-preview'>
-          <View className='case-card' onClick={() => navigateToCaseDetail(1)}>
-            <Image
-              src='https://via.placeholder.com/340x240/667eea/ffffff?text=案例1'
-              className='case-image'
-              mode='aspectFill'
-            />
-            <View className='case-info'>
-              <View className='case-title'>现代简约 · 三居室</View>
-              <View className='case-tags'>
-                <Text className='tag'>120㎡</Text>
-                <Text className='tag'>15万</Text>
-              </View>
-            </View>
+
+        {loading ? renderLoading() : error ? renderError() : (
+          <View className='cases-preview'>
+            {latestCases.length > 0
+              ? latestCases.slice(0, 2).map(renderCaseCard)
+              : renderEmpty()
+            }
           </View>
-          <View className='case-card' onClick={() => navigateToCaseDetail(2)}>
-            <Image
-              src='https://via.placeholder.com/340x240/764ba2/ffffff?text=案例2'
-              className='case-image'
-              mode='aspectFill'
-            />
-            <View className='case-info'>
-              <View className='case-title'>北欧风格 · 两居室</View>
-              <View className='case-tags'>
-                <Text className='tag'>90㎡</Text>
-                <Text className='tag'>12万</Text>
-              </View>
-            </View>
-          </View>
-        </View>
+        )}
       </View>
 
       {/* 设计师推荐 */}
@@ -262,18 +254,19 @@ export default function Index() {
           <View className='section-title'>明星设计师</View>
           <Text className='more-link' onClick={navigateToDesigners}>查看更多 →</Text>
         </View>
-        <View className='designer-card' onClick={() => navigateToDesignerDetail(1)}>
+        <View className='designer-card' onClick={navigateToDesigners}>
           <Image
             src='https://via.placeholder.com/120x120/667eea/ffffff?text=设计师'
             className='designer-avatar'
             mode='aspectFill'
           />
           <View className='designer-info'>
-            <View className='designer-name'>张设计师</View>
-            <View className='designer-title'>首席设计师 · 10年经验</View>
+            <View className='designer-name'>查看更多设计师</View>
+            <View className='designer-title'>专业设计师团队为您服务</View>
             <View className='designer-tags'>
               <Text className='tag'>现代简约</Text>
-              <Text className='tag'>北欧风</Text>
+              <Text className='tag'>北欧风格</Text>
+              <Text className='tag'>中式风格</Text>
             </View>
           </View>
         </View>

@@ -6,10 +6,12 @@ export interface IUser extends Document {
   avatar?: string;
   phone?: string;
   openid?: string;
+  password?: string;
   gender?: 'male' | 'female' | 'unknown';
   region?: string;
   signature?: string;
   role: 'user' | 'merchant' | 'admin';
+  merchantId?: mongoose.Types.ObjectId;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -39,6 +41,11 @@ const UserSchema = new Schema<IUser>(
       unique: true,
       sparse: true,
     },
+    password: {
+      type: String,
+      minlength: [6, '密码至少6个字符'],
+      select: false, // 默认查询不返回密码
+    },
     gender: {
       type: String,
       enum: ['male', 'female', 'unknown'],
@@ -58,6 +65,10 @@ const UserSchema = new Schema<IUser>(
       enum: ['user', 'merchant', 'admin'],
       default: 'user',
     },
+    merchantId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Merchant',
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -72,11 +83,23 @@ const UserSchema = new Schema<IUser>(
 UserSchema.index({ phone: 1 });
 UserSchema.index({ openid: 1 });
 UserSchema.index({ createdAt: -1 });
+UserSchema.index({ merchantId: 1 });
 
-// 方法：比较密码（如果后续需要密码登录）
+// 密码加密钩子
+UserSchema.pre('save', async function (next) {
+  if (!this.isModified('password') || !this.password) {
+    return next();
+  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+// 方法：比较密码
 UserSchema.methods.comparePassword = async function (
   candidatePassword: string
 ): Promise<boolean> {
+  if (!this.password) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
 

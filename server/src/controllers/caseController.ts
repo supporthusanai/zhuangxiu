@@ -96,13 +96,22 @@ export const getCaseById = async (
     caseDetail.viewCount += 1;
     await caseDetail.save();
 
-    // 记录浏览历史（如果用户已登录）
+    // 记录浏览历史（如果用户已登录）- 使用 upsert 避免重复
     if (req.userId) {
-      await BrowseHistory.create({
-        user: req.userId,
-        targetType: 'case',
-        targetId: id,
-      });
+      await BrowseHistory.findOneAndUpdate(
+        {
+          user: req.userId,
+          targetType: 'case',
+          targetId: id,
+        },
+        {
+          $set: { createdAt: new Date() }, // 更新时间戳
+        },
+        {
+          upsert: true,
+          new: true,
+        }
+      );
     }
 
     res.status(200).json({
@@ -117,7 +126,7 @@ export const getCaseById = async (
   }
 };
 
-// 搜索案例
+// 搜索案例（支持全文搜索和正则搜索）
 export const searchCases = async (
   req: AuthRequest,
   res: Response
@@ -129,27 +138,53 @@ export const searchCases = async (
       throw new AppError('搜索关键词不能为空', 400);
     }
 
-    // 构建搜索查询
-    const searchQuery = {
-      status: 'published',
-      $or: [
-        { title: { $regex: keyword as string, $options: 'i' } },
-        { description: { $regex: keyword as string, $options: 'i' } },
-        { style: { $regex: keyword as string, $options: 'i' } },
-        { tags: { $regex: keyword as string, $options: 'i' } },
-      ],
-    };
-
+    const searchKeyword = keyword as string;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const [cases, total] = await Promise.all([
-      Case.find(searchQuery)
+    let cases: any[];
+    let total: number;
+
+    try {
+      // 优先尝试全文搜索（更高效）
+      const textSearchQuery = {
+        status: 'published',
+        $text: { $search: searchKeyword },
+      };
+
+      const textSearchResults = await Case.find(textSearchQuery)
+        .select({ score: { $meta: 'textScore' } })
         .populate('designer', 'name avatar title')
-        .sort({ viewCount: -1, createdAt: -1 })
+        .sort({ score: { $meta: 'textScore' }, viewCount: -1 })
         .skip(skip)
-        .limit(Number(limit)),
-      Case.countDocuments(searchQuery),
-    ]);
+        .limit(Number(limit));
+
+      if (textSearchResults.length > 0) {
+        cases = textSearchResults;
+        total = await Case.countDocuments(textSearchQuery);
+      } else {
+        throw new Error('No text search results');
+      }
+    } catch {
+      // 回退到正则搜索
+      const regexQuery = {
+        status: 'published',
+        $or: [
+          { title: { $regex: searchKeyword, $options: 'i' } },
+          { description: { $regex: searchKeyword, $options: 'i' } },
+          { style: { $regex: searchKeyword, $options: 'i' } },
+          { tags: { $regex: searchKeyword, $options: 'i' } },
+        ],
+      };
+
+      [cases, total] = await Promise.all([
+        Case.find(regexQuery)
+          .populate('designer', 'name avatar title')
+          .sort({ viewCount: -1, createdAt: -1 })
+          .skip(skip)
+          .limit(Number(limit)),
+        Case.countDocuments(regexQuery),
+      ]);
+    }
 
     res.status(200).json({
       success: true,
