@@ -239,6 +239,117 @@ export const deleteConversation = async (
   }
 };
 
+// 发送消息
+export const sendMessage = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { conversationId } = req.params;
+    const { content, type = 'text', mediaUrl } = req.body;
+
+    if (!content && !mediaUrl) {
+      throw new AppError('消息内容不能为空', 400);
+    }
+
+    // 验证会话权限
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      throw new AppError('会话不存在', 404);
+    }
+
+    const isParticipant = conversation.participants.some(
+      (p) => p.userId.toString() === req.userId
+    );
+    if (!isParticipant) {
+      throw new AppError('无权在该会话中发送消息', 403);
+    }
+
+    // 获取接收者
+    const receiver = conversation.participants.find(
+      (p) => p.userId.toString() !== req.userId
+    );
+
+    if (!receiver) {
+      throw new AppError('找不到接收者', 400);
+    }
+
+    // 创建消息
+    const message = await Message.create({
+      conversationId,
+      sender: req.userId,
+      receiver: receiver.userId,
+      content,
+      type,
+      mediaUrl,
+    });
+
+    // 更新会话的最后消息
+    conversation.lastMessage = {
+      content: type === 'text' ? content : `[${type === 'image' ? '图片' : '文件'}]`,
+      senderId: req.user!._id,
+      createdAt: new Date(),
+    };
+    await conversation.save();
+
+    await message.populate('sender', 'nickname avatar');
+
+    res.status(201).json({
+      success: true,
+      message: '发送成功',
+      data: message,
+    });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '发送消息失败',
+    });
+  }
+};
+
+// 标记消息已读
+export const markMessagesRead = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { conversationId } = req.params;
+
+    // 验证会话权限
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      throw new AppError('会话不存在', 404);
+    }
+
+    const isParticipant = conversation.participants.some(
+      (p) => p.userId.toString() === req.userId
+    );
+    if (!isParticipant) {
+      throw new AppError('无权访问该会话', 403);
+    }
+
+    // 标记所有发给当前用户的消息为已读
+    await Message.updateMany(
+      {
+        conversationId,
+        receiver: req.userId,
+        isRead: false,
+      },
+      { isRead: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: '标记成功',
+    });
+  } catch (error) {
+    res.status(error instanceof AppError ? error.statusCode : 500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '标记失败',
+    });
+  }
+};
+
 // 获取未读消息数
 export const getUnreadCount = async (
   req: AuthRequest,

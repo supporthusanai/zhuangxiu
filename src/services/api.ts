@@ -441,8 +441,9 @@ export const getMessages = (conversationId: string, params?: {
 
 // 创建对话
 export const createConversation = (data: {
-  participantId: string;
-  participantType: 'user' | 'merchant' | 'designer';
+  receiverId: string;
+  caseId?: string;
+  designerId?: string;
 }) => {
   return post('/chat/conversations', data, true);
 };
@@ -450,6 +451,20 @@ export const createConversation = (data: {
 // 删除对话
 export const deleteConversation = (id: string) => {
   return del(`/chat/conversations/${id}`, undefined, true);
+};
+
+// 发送消息
+export const sendMessage = (conversationId: string, data: {
+  content: string;
+  type?: 'text' | 'image' | 'file';
+  mediaUrl?: string;
+}) => {
+  return post(`/chat/conversations/${conversationId}/messages`, data, true);
+};
+
+// 标记消息已读
+export const markMessagesRead = (conversationId: string) => {
+  return put(`/chat/conversations/${conversationId}/read`, undefined, true);
 };
 
 // 获取未读消息数量
