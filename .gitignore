@@ -41,3 +41,4 @@ logs
 .stylelintcache
 .swc/
 web/dist
+admin/dist
