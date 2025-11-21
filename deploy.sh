@@ -146,8 +146,26 @@ check_dependencies() {
 check_services() {
     log_step "检查服务状态..."
 
-    # MongoDB
-    if systemctl is-active --quiet mongod 2>/dev/null || pgrep -x mongod > /dev/null; then
+    # MongoDB - 使用多种方式检测
+    local mongo_running=false
+    # 方式1: 尝试连接 MongoDB
+    if command -v mongosh &> /dev/null && mongosh --eval "db.runCommand({ping:1})" --quiet 2>/dev/null | grep -q "ok"; then
+        mongo_running=true
+    # 方式2: 使用旧版 mongo 客户端
+    elif command -v mongo &> /dev/null && mongo --eval "db.runCommand({ping:1})" --quiet 2>/dev/null | grep -q "ok"; then
+        mongo_running=true
+    # 方式3: 检查 systemctl 服务状态
+    elif systemctl is-active --quiet mongod 2>/dev/null; then
+        mongo_running=true
+    # 方式4: 检查进程（支持多种进程名）
+    elif pgrep -x mongod > /dev/null 2>&1 || pgrep -x mongodb > /dev/null 2>&1; then
+        mongo_running=true
+    # 方式5: 检查端口是否被监听
+    elif netstat -tuln 2>/dev/null | grep -q ":27017 " || ss -tuln 2>/dev/null | grep -q ":27017 "; then
+        mongo_running=true
+    fi
+
+    if [ "$mongo_running" = true ]; then
         log_info "MongoDB: 运行中 ✓"
     else
         log_warn "MongoDB: 未运行"
@@ -156,8 +174,23 @@ check_services() {
         fi
     fi
 
-    # Redis
-    if systemctl is-active --quiet redis-server 2>/dev/null || pgrep -x redis-server > /dev/null; then
+    # Redis - 使用多种方式检测
+    local redis_running=false
+    # 方式1: 使用 redis-cli ping（最可靠的方式）
+    if command -v redis-cli &> /dev/null && redis-cli ping 2>/dev/null | grep -qi "pong"; then
+        redis_running=true
+    # 方式2: 检查 systemctl 服务状态
+    elif systemctl is-active --quiet redis-server 2>/dev/null || systemctl is-active --quiet redis 2>/dev/null; then
+        redis_running=true
+    # 方式3: 检查进程（支持多种进程名）
+    elif pgrep -x redis-server > /dev/null 2>&1 || pgrep -x redis > /dev/null 2>&1; then
+        redis_running=true
+    # 方式4: 检查端口是否被监听
+    elif netstat -tuln 2>/dev/null | grep -q ":6379 " || ss -tuln 2>/dev/null | grep -q ":6379 "; then
+        redis_running=true
+    fi
+
+    if [ "$redis_running" = true ]; then
         log_info "Redis: 运行中 ✓"
     else
         log_warn "Redis: 未运行"
