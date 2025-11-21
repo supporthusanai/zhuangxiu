@@ -225,12 +225,35 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') }
 
 const adminConfig = ${JSON.stringify(adminConfig, null, 2)};
 
+// 定义 User Schema（不依赖 TypeScript 编译）
+const UserSchema = new mongoose.Schema({
+  nickname: { type: String, required: true, trim: true },
+  avatar: { type: String, default: '' },
+  phone: { type: String, unique: true, sparse: true },
+  openid: { type: String, unique: true, sparse: true },
+  password: { type: String, select: false },
+  gender: { type: String, enum: ['male', 'female', 'unknown'], default: 'unknown' },
+  region: { type: String, default: '' },
+  signature: { type: String, default: '' },
+  role: { type: String, enum: ['user', 'merchant', 'admin'], default: 'user' },
+  merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant' },
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
+
+// 密码加密钩子
+UserSchema.pre('save', async function(next) {
+  if (!this.isModified('password') || !this.password) return next();
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+const User = mongoose.model('User', UserSchema);
+
 async function initAdmin() {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('数据库连接成功');
-
-    const User = require('../src/models/User').default;
 
     // 检查管理员是否已存在
     const existingAdmin = await User.findOne({ phone: adminConfig.phone });
