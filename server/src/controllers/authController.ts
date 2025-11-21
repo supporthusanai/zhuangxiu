@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
@@ -7,9 +7,12 @@ import { wechatLogin as wechatLoginApi, getPhoneNumber } from '../utils/wechat';
 
 // 生成 JWT Token
 const generateToken = (userId: string): string => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET || 'secret', {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  });
+  const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
+  return jwt.sign(
+    { userId },
+    process.env.JWT_SECRET || 'secret',
+    { expiresIn } as jwt.SignOptions
+  );
 };
 
 // 微信小程序登录
