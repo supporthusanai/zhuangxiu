@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import bcrypt from 'bcryptjs';
 
 export interface IUser extends Document {
   nickname: string;
@@ -13,7 +12,6 @@ export interface IUser extends Document {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-  comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -73,11 +71,7 @@ UserSchema.index({ phone: 1 });
 UserSchema.index({ openid: 1 });
 UserSchema.index({ createdAt: -1 });
 
-// 方法：比较密码（如果后续需要密码登录）
-UserSchema.methods.comparePassword = async function (
-  candidatePassword: string
-): Promise<boolean> {
-  return bcrypt.compare(candidatePassword, this.password);
-};
+// 注：当前系统使用微信登录和手机验证码登录，不需要密码字段
+// 如果后续需要密码登录功能，请添加 password 字段并实现相关逻辑
 
 export default mongoose.model<IUser>('User', UserSchema);

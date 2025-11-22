@@ -58,6 +58,30 @@ app.use(errorHandler);
 // 启动服务器
 const startServer = async (): Promise<void> => {
   try {
+    // 环境变量验证
+    const requiredEnvVars = {
+      'JWT_SECRET': process.env.JWT_SECRET,
+      'MONGODB_URI': process.env.MONGODB_URI,
+      'WECHAT_APP_ID': process.env.WECHAT_APP_ID,
+      'WECHAT_APP_SECRET': process.env.WECHAT_APP_SECRET,
+    };
+
+    const invalidVars: string[] = [];
+    Object.entries(requiredEnvVars).forEach(([key, value]) => {
+      if (!value || value === 'your-secret-key-here' || value === 'your-app-id' || value === 'your-app-secret') {
+        invalidVars.push(key);
+      }
+    });
+
+    if (invalidVars.length > 0) {
+      logger.error(`❌ 以下环境变量未设置或使用默认值: ${invalidVars.join(', ')}`);
+      logger.error('❌ 请在 .env 文件中配置正确的环境变量');
+      logger.error('❌ 服务器拒绝启动');
+      process.exit(1);
+    }
+
+    logger.info('✅ 环境变量验证通过');
+
     // 连接数据库
     await connectMongoDB();
     await connectRedis();

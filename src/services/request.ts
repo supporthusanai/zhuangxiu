@@ -54,7 +54,7 @@ export const request = async <T = any>(config: RequestConfig): Promise<Response<
   const { url, method = 'GET', data, header = {}, needAuth = false } = config;
 
   // 构建完整 URL
-  const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`;
+  let fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`;
 
   // 构建请求头
   const headers: any = {
@@ -81,11 +81,27 @@ export const request = async <T = any>(config: RequestConfig): Promise<Response<
     }
   }
 
+  // GET 请求参数处理：将 data 转换为查询字符串
+  let requestData = data;
+  if (method === 'GET' && data) {
+    const params = new URLSearchParams();
+    Object.keys(data).forEach(key => {
+      if (data[key] !== undefined && data[key] !== null) {
+        params.append(key, String(data[key]));
+      }
+    });
+    const queryString = params.toString();
+    if (queryString) {
+      fullUrl += (fullUrl.includes('?') ? '&' : '?') + queryString;
+    }
+    requestData = undefined; // GET 请求不需要 body
+  }
+
   try {
     const res = await Taro.request({
       url: fullUrl,
       method,
-      data,
+      data: requestData,
       header: headers,
       timeout: 30000,
     });

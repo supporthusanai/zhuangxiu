@@ -1,6 +1,6 @@
 import { View, Text, Input, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { mockLogin, wechatLoginComplete } from '@/utils/user'
 import './index.scss'
 
@@ -9,6 +9,17 @@ export default function Login() {
   const [code, setCode] = useState('')
   const [countdown, setCountdown] = useState(0)
   const [loading, setLoading] = useState(false)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [])
 
   // 发送验证码
   const handleSendCode = () => {
@@ -30,6 +41,12 @@ export default function Login() {
       return
     }
 
+    // 清除之前的定时器（如果存在）
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+
     // 模拟发送验证码
     Taro.showToast({
       title: '验证码已发送',
@@ -40,11 +57,12 @@ export default function Login() {
     // 开始倒计时
     let count = 60
     setCountdown(count)
-    const timer = setInterval(() => {
+    timerRef.current = setInterval(() => {
       count--
       setCountdown(count)
-      if (count <= 0) {
-        clearInterval(timer)
+      if (count <= 0 && timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
       }
     }, 1000)
   }
