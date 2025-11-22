@@ -4,11 +4,12 @@ import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { wechatLogin as wechatLoginApi, getPhoneNumber } from '../utils/wechat';
+import { envConfig } from '../config/env';
 
 // 生成 JWT Token
 const generateToken = (userId: string): string => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET || 'secret', {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  return jwt.sign({ userId }, envConfig.JWT_SECRET, {
+    expiresIn: envConfig.JWT_EXPIRES_IN,
   });
 };
 

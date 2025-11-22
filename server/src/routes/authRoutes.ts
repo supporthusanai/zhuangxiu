@@ -7,14 +7,15 @@ import {
   getWechatPhone,
 } from '../controllers/authController';
 import { authenticate } from '../middleware/auth';
+import { authLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
-// 微信登录
-router.post('/wechat-login', wechatLogin);
+// 微信登录（限流保护）
+router.post('/wechat-login', authLimiter, wechatLogin);
 
-// 手机号登录
-router.post('/phone-login', phoneLogin);
+// 手机号登录（限流保护）
+router.post('/phone-login', authLimiter, phoneLogin);
 
 // 获取当前用户信息（需要认证）
 router.get('/me', authenticate, getCurrentUser);

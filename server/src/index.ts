@@ -1,11 +1,11 @@
 import express, { Application } from 'express';
 import { createServer } from 'http';
-import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import swaggerUi from 'swagger-ui-express';
+import { envConfig } from './config/env'; // 必须在最前面导入，会验证环境变量
 import { connectMongoDB, connectRedis, closeDatabases } from './config/database';
 import { initSocket } from './config/socket';
 import { swaggerSpec } from './config/swagger';
@@ -14,31 +14,40 @@ import { initQueueProcessors } from './queues';
 import { closeQueues } from './config/queue';
 import routes from './routes';
 import { errorHandler, notFound } from './middleware/errorHandler';
-
-// 加载环境变量
-dotenv.config();
+import { apiLimiter } from './middleware/rateLimiter';
+import { correlationId, responseTime, enhancedLogging } from './middleware/monitoring';
 
 // 创建 Express 应用
 const app: Application = express();
 const httpServer = createServer(app);
-const PORT = process.env.PORT || 3000;
+const PORT = envConfig.PORT;
 
-// 中间件
+// 中间件（顺序很重要）
 app.use(helmet()); // 安全头
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+  origin: envConfig.ALLOWED_ORIGINS,
   credentials: true,
 }));
 app.use(compression()); // 响应压缩
+
+// 监控中间件
+app.use(correlationId); // 请求追踪 ID
+app.use(responseTime); // 响应时间监控
+app.use(enhancedLogging); // 增强日志
+
 app.use(morgan(
-  process.env.NODE_ENV === 'development' ? 'dev' : 'combined',
+  envConfig.NODE_ENV === 'development' ? 'dev' : 'combined',
   { stream: httpLoggerStream }
 )); // HTTP 日志
+
+// Rate limiting - 全局 API 限流
+app.use('/api/', apiLimiter);
+
 app.use(express.json({ limit: '10mb' })); // JSON 解析
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); // URL 编码解析
 
 // 静态文件（上传）
-app.use('/uploads', express.static(process.env.UPLOAD_DIR || 'uploads'));
+app.use('/uploads', express.static(envConfig.UPLOAD_DIR));
 
 // API 文档
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
@@ -77,7 +86,7 @@ const startServer = async (): Promise<void> => {
 ║                                            ║
 ║   🚀 装修小程序后端服务已启动              ║
 ║                                            ║
-║   环境：${process.env.NODE_ENV || 'development'}
+║   环境：${envConfig.NODE_ENV}
 ║   端口：${PORT}
 ║   时间：${new Date().toLocaleString('zh-CN')}
 ║   Socket.io: ✅ 已启用

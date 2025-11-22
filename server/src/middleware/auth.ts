@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import User from '../models/User';
+import User, { IUser } from '../models/User';
+import { envConfig } from '../config/env';
 
 export interface AuthRequest extends Request {
-  user?: any;
+  user?: IUser;
   userId?: string;
   file?: Express.Multer.File;
   files?: Express.Multer.File[];
@@ -28,7 +29,7 @@ export const authenticate = async (
     }
 
     // 验证 token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as {
+    const decoded = jwt.verify(token, envConfig.JWT_SECRET) as {
       userId: string;
     };
 
@@ -90,7 +91,7 @@ export const optionalAuth = async (
     const token = req.header('Authorization')?.replace('Bearer ', '');
 
     if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as {
+      const decoded = jwt.verify(token, envConfig.JWT_SECRET) as {
         userId: string;
       };
 

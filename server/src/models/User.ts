@@ -6,6 +6,7 @@ export interface IUser extends Document {
   avatar?: string;
   phone?: string;
   openid?: string;
+  password?: string; // 可选：用于未来可能的密码登录功能
   gender?: 'male' | 'female' | 'unknown';
   region?: string;
   signature?: string;
@@ -13,7 +14,7 @@ export interface IUser extends Document {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-  comparePassword(candidatePassword: string): Promise<boolean>;
+  comparePassword?(candidatePassword: string): Promise<boolean>;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -38,6 +39,11 @@ const UserSchema = new Schema<IUser>(
       type: String,
       unique: true,
       sparse: true,
+    },
+    password: {
+      type: String,
+      select: false, // 默认查询时不返回密码字段
+      minlength: [6, '密码至少6个字符'],
     },
     gender: {
       type: String,
@@ -73,10 +79,29 @@ UserSchema.index({ phone: 1 });
 UserSchema.index({ openid: 1 });
 UserSchema.index({ createdAt: -1 });
 
-// 方法：比较密码（如果后续需要密码登录）
+// Pre-save 钩子：密码加密
+UserSchema.pre('save', async function (next) {
+  // 只有在密码被修改时才加密
+  if (!this.isModified('password') || !this.password) {
+    return next();
+  }
+
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error as Error);
+  }
+});
+
+// 方法：比较密码（用于密码登录）
 UserSchema.methods.comparePassword = async function (
   candidatePassword: string
 ): Promise<boolean> {
+  if (!this.password) {
+    return false;
+  }
   return bcrypt.compare(candidatePassword, this.password);
 };
 
