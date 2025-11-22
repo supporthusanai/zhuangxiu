@@ -7,16 +7,33 @@ yarn-debug.log*
 yarn-error.log*
 package-lock.json
 yarn.lock
+pnpm-lock.yaml
 
-# production
+# production builds
 /dist
+/build
+/.next
+/out
+
+# environment files
+.env
+.env.*
+!.env.example
 
 # misc
 .DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.AppleDouble
+.LSOverride
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
 
 # IDE
 .idea/
@@ -24,18 +41,54 @@ yarn.lock
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
 
 # Taro
 .temp/
 .rn_temp/
 
 # logs
-logs
+logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
 
 # testing
 /coverage
+/.nyc_output
+*.lcov
+.coverage
 
 # cache
 .eslintcache
 .stylelintcache
+.parcel-cache
+.cache
+.npm
+.yarn
+.next/cache
+
+# uploads
+uploads/
+public/uploads/
+
+# backup files
+*.bak
+*.backup
+*.old
+*.tmp
+*.temp
+
+# OS files
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
