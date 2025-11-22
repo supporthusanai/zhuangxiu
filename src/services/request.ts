@@ -1,7 +1,36 @@
 import Taro from '@tarojs/taro';
 
-// API 基础地址
-const BASE_URL = process.env.TARO_APP_API_URL || 'http://localhost:3000/api/v1';
+// API 基础地址配置
+// H5 环境下：开发模式使用相对路径（通过代理），生产模式使用完整 URL
+// 小程序环境下：始终使用完整 URL
+const getBaseUrl = (): string => {
+  const env = process.env.NODE_ENV;
+  const isH5 = process.env.TARO_ENV === 'h5';
+
+  // 优先使用环境变量配置
+  if (process.env.TARO_APP_API_URL) {
+    // H5 开发模式下，如果配置了完整 URL，但可以使用代理，则使用相对路径
+    if (isH5 && env === 'development') {
+      return '/api/v1';
+    }
+    return process.env.TARO_APP_API_URL;
+  }
+
+  // 默认配置
+  if (isH5) {
+    // H5 开发模式使用相对路径（通过 webpack-dev-server 代理）
+    if (env === 'development') {
+      return '/api/v1';
+    }
+    // H5 生产模式需要配置实际域名
+    return 'https://your-domain.com/api/v1';
+  }
+
+  // 小程序环境始终使用完整 URL
+  return 'http://localhost:3000/api/v1';
+};
+
+const BASE_URL = getBaseUrl();
 
 // Token 存储 key
 const TOKEN_KEY = 'auth_token';
