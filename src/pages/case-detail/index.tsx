@@ -7,29 +7,33 @@ import {
   removeFavoriteCase
 } from '@/utils/favorite'
 import { addBrowseHistory } from '@/utils/recommendation'
+import { getCaseDetail as fetchCaseDetail } from '@/services/api'
 import './index.scss'
 
 interface CaseDetail {
-  id: number
+  id: string
+  _id: string
   title: string
   style: string
-  area: string
-  price: string
-  designer: {
+  area: number
+  budget: number
+  merchant?: {
+    _id: string
+    companyName: string
+    logo?: string
+  }
+  designer?: {
+    _id: string
     name: string
     avatar: string
-    title: string
+    title?: string
   }
   images: string[]
   description: string
   tags: string[]
-  specs: {
-    label: string
-    value: string
-  }[]
   rooms: string
-  floor: string
-  district: string
+  floor?: string
+  district?: string
 }
 
 function CaseDetail() {
@@ -39,10 +43,11 @@ function CaseDetail() {
 
   // 启用分享功能
   Taro.useShareAppMessage(() => {
+    const caseId = caseDetail?._id || caseDetail?.id
     return {
       title: caseDetail?.title || '装修案例分享',
-      path: `/pages/case-detail/index?id=${caseDetail?.id}`,
-      imageUrl: caseDetail?.images[0] || ''
+      path: `/pages/case-detail/index?id=${caseId}`,
+      imageUrl: caseDetail?.images?.[0] || ''
     }
   })
 
@@ -58,50 +63,51 @@ function CaseDetail() {
   // 检查是否已收藏
   useEffect(() => {
     if (caseDetail) {
-      setIsFavorite(isCaseFavorited(caseDetail.id))
+      const caseId = caseDetail._id || caseDetail.id
+      setIsFavorite(isCaseFavorited(caseId))
     }
   }, [caseDetail])
 
-  const loadCaseDetail = (id: string) => {
-    // 模拟数据
-    const mockData: CaseDetail = {
-      id: parseInt(id),
-      title: '现代简约 · 三居室',
-      style: '现代简约',
-      area: '120㎡',
-      price: '15万',
-      designer: {
-        name: '张设计师',
-        avatar: 'https://via.placeholder.com/100x100/667eea/ffffff?text=张',
-        title: '首席设计师 · 10年经验'
-      },
-      images: [
-        'https://via.placeholder.com/750x600/667eea/ffffff?text=客厅',
-        'https://via.placeholder.com/750x600/764ba2/ffffff?text=卧室',
-        'https://via.placeholder.com/750x600/f093fb/ffffff?text=厨房',
-        'https://via.placeholder.com/750x600/4facfe/ffffff?text=卫生间'
-      ],
-      description: '本案例采用现代简约风格，以简洁明快的设计手法，营造出温馨舒适的居住空间。整体色调以白色和灰色为主，搭配木质家具，呈现出自然清新的氛围。客厅采用开放式设计，增加空间的通透感；卧室注重舒适性和私密性；厨房采用一字型布局，兼顾美观与实用。',
-      tags: ['简约', '舒适', '温馨', '实用'],
-      specs: [
-        { label: '户型', value: '三室两厅一卫' },
-        { label: '面积', value: '120㎡' },
-        { label: '风格', value: '现代简约' },
-        { label: '预算', value: '15万' },
-        { label: '工期', value: '90天' }
-      ],
-      rooms: '3室2厅1卫',
-      floor: '中层',
-      district: '朝阳区'
-    }
-    setCaseDetail(mockData)
+  // 生成规格参数
+  const getSpecs = () => {
+    if (!caseDetail) return []
+    return [
+      { label: '户型', value: caseDetail.rooms || '-' },
+      { label: '面积', value: caseDetail.area ? `${caseDetail.area}㎡` : '-' },
+      { label: '风格', value: caseDetail.style || '-' },
+      { label: '预算', value: caseDetail.budget ? `${caseDetail.budget}万` : '-' },
+      { label: '楼层', value: caseDetail.floor || '-' }
+    ]
+  }
 
-    // 添加到浏览历史
-    addBrowseHistory({
-      id: parseInt(id),
-      type: 'case',
-      style: mockData.style
-    })
+  const loadCaseDetail = async (id: string) => {
+    try {
+      const res = await fetchCaseDetail(id)
+      if (res.success && res.data) {
+        const data = res.data
+        setCaseDetail(data)
+
+        // 添加到浏览历史
+        addBrowseHistory({
+          id: data._id || id,
+          type: 'case',
+          style: data.style
+        })
+      } else {
+        Taro.showToast({
+          title: res.message || '加载失败',
+          icon: 'none',
+          duration: 2000
+        })
+      }
+    } catch (error) {
+      console.error('加载案例详情失败:', error)
+      Taro.showToast({
+        title: '加载案例详情失败',
+        icon: 'none',
+        duration: 2000
+      })
+    }
   }
 
   const handleSwiperChange = (e: any) => {
@@ -111,9 +117,11 @@ function CaseDetail() {
   const handleFavorite = () => {
     if (!caseDetail) return
 
+    const caseId = caseDetail._id || caseDetail.id
+
     if (isFavorite) {
       // 取消收藏
-      const success = removeFavoriteCase(caseDetail.id)
+      const success = removeFavoriteCase(caseId)
       if (success) {
         setIsFavorite(false)
         Taro.showToast({
@@ -125,13 +133,13 @@ function CaseDetail() {
     } else {
       // 添加收藏
       const success = addFavoriteCase({
-        id: caseDetail.id,
-        image: caseDetail.images[0],
+        id: caseId,
+        image: caseDetail.images?.[0] || '',
         title: caseDetail.title,
         style: caseDetail.style,
-        area: caseDetail.area,
-        price: caseDetail.price,
-        designer: caseDetail.designer.name
+        area: caseDetail.area ? `${caseDetail.area}㎡` : '-',
+        price: caseDetail.budget ? `${caseDetail.budget}万` : '-',
+        designer: caseDetail.designer?.name || caseDetail.merchant?.companyName || '-'
       })
       if (success) {
         setIsFavorite(true)
@@ -152,8 +160,10 @@ function CaseDetail() {
 
   const handleConsultDesigner = () => {
     if (!caseDetail) return
+    const caseId = caseDetail._id || caseDetail.id
+    const designerName = caseDetail.designer?.name || caseDetail.merchant?.companyName || '设计师'
     Taro.navigateTo({
-      url: `/pages/chat/index?type=case&caseId=${caseDetail.id}&caseTitle=${encodeURIComponent(caseDetail.title)}&designerName=${encodeURIComponent(caseDetail.designer.name)}`
+      url: `/pages/chat/index?type=case&caseId=${caseId}&caseTitle=${encodeURIComponent(caseDetail.title)}&designerName=${encodeURIComponent(designerName)}`
     })
   }
 
@@ -178,10 +188,14 @@ function CaseDetail() {
   }
 
   const handleViewDesigner = () => {
-    // 假设设计师 ID 为 1，实际应该从案例详情数据中获取
-    Taro.navigateTo({
-      url: '/pages/designer-detail/index?id=1'
-    })
+    if (!caseDetail) return
+    // 优先使用设计师ID，否则使用商家ID
+    const designerId = caseDetail.designer?._id || caseDetail.merchant?._id
+    if (designerId) {
+      Taro.navigateTo({
+        url: `/pages/designer-detail/index?id=${designerId}`
+      })
+    }
   }
 
   if (!caseDetail) {
@@ -203,14 +217,14 @@ function CaseDetail() {
           autoplay={false}
           onChange={handleSwiperChange}
         >
-          {caseDetail.images.map((image, index) => (
+          {(caseDetail.images || []).map((image, index) => (
             <SwiperItem key={index} onClick={handleImagePreview}>
               <Image src={image} className='case-image' mode='aspectFill' />
             </SwiperItem>
           ))}
         </Swiper>
         <View className='image-indicator'>
-          {currentImageIndex + 1} / {caseDetail.images.length}
+          {currentImageIndex + 1} / {(caseDetail.images || []).length}
         </View>
       </View>
 
@@ -218,10 +232,10 @@ function CaseDetail() {
       <View className='info-section'>
         <View className='case-header'>
           <View className='case-title'>{caseDetail.title}</View>
-          <View className='case-price'>¥{caseDetail.price}</View>
+          <View className='case-price'>{caseDetail.budget ? `¥${caseDetail.budget}万` : '-'}</View>
         </View>
         <View className='case-tags'>
-          {caseDetail.tags.map((tag, index) => (
+          {(caseDetail.tags || []).map((tag, index) => (
             <Text key={index} className='tag'>{tag}</Text>
           ))}
         </View>
@@ -231,7 +245,7 @@ function CaseDetail() {
       <View className='specs-section'>
         <View className='section-title'>项目信息</View>
         <View className='specs-grid'>
-          {caseDetail.specs.map((spec, index) => (
+          {getSpecs().map((spec, index) => (
             <View key={index} className='spec-item'>
               <Text className='spec-label'>{spec.label}</Text>
               <Text className='spec-value'>{spec.value}</Text>
@@ -246,22 +260,24 @@ function CaseDetail() {
         <Text className='description-text'>{caseDetail.description}</Text>
       </View>
 
-      {/* 设计师信息 */}
-      <View className='designer-section'>
-        <View className='section-title'>设计师</View>
-        <View className='designer-card' onClick={handleViewDesigner}>
-          <Image
-            src={caseDetail.designer.avatar}
-            className='designer-avatar'
-            mode='aspectFill'
-          />
-          <View className='designer-info'>
-            <View className='designer-name'>{caseDetail.designer.name}</View>
-            <View className='designer-title'>{caseDetail.designer.title}</View>
+      {/* 设计师/商家信息 */}
+      {(caseDetail.designer || caseDetail.merchant) && (
+        <View className='designer-section'>
+          <View className='section-title'>{caseDetail.designer ? '设计师' : '商家'}</View>
+          <View className='designer-card' onClick={handleViewDesigner}>
+            <Image
+              src={caseDetail.designer?.avatar || caseDetail.merchant?.logo || 'https://via.placeholder.com/100x100/667eea/ffffff?text=商'}
+              className='designer-avatar'
+              mode='aspectFill'
+            />
+            <View className='designer-info'>
+              <View className='designer-name'>{caseDetail.designer?.name || caseDetail.merchant?.companyName || '-'}</View>
+              <View className='designer-title'>{caseDetail.designer?.title || '专业装修服务'}</View>
+            </View>
+            <View className='view-more'>查看 ›</View>
           </View>
-          <View className='view-more'>查看 ›</View>
         </View>
-      </View>
+      )}
 
       {/* 底部操作栏 */}
       <View className='action-bar'>

@@ -6,6 +6,8 @@ import {
   createConversation,
   deleteConversation,
   getUnreadCount,
+  sendMessage,
+  markMessagesRead,
 } from '../controllers/chatController';
 import { authenticate } from '../middleware/auth';
 
@@ -22,6 +24,8 @@ router.delete('/conversations/:id', deleteConversation); // 删除会话
 
 // 消息相关
 router.get('/conversations/:conversationId/messages', getMessages); // 获取消息历史
+router.post('/conversations/:conversationId/messages', sendMessage); // 发送消息
+router.put('/conversations/:conversationId/read', markMessagesRead); // 标记已读
 router.get('/unread-count', getUnreadCount); // 获取未读消息数
 
 export default router;

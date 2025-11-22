@@ -2,11 +2,11 @@
 
 ## 概述
 
-本文档描述装修小程序后端需要实现的 API 接口。
+本文档描述装修小程序后端 API 接口。
 
 ## 基础信息
 
-- **Base URL**: `https://api.yourdomain.com/api/v1`
+- **Base URL**: `/api/v1`
 - **请求格式**: JSON
 - **响应格式**: JSON
 - **字符编码**: UTF-8
@@ -15,435 +15,386 @@
 
 ```json
 {
-  "code": 200,
-  "message": "success",
+  "success": true,
+  "message": "操作成功",
   "data": {}
 }
 ```
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| code | number | 状态码，200 表示成功 |
-| message | string | 响应消息 |
-| data | object | 响应数据 |
+## 认证方式
 
-## 常见状态码
+需要认证的接口请在请求头中携带：
+```
+Authorization: Bearer {token}
+```
+
+---
+
+## 1. 认证模块 `/auth`
+
+### 1.1 微信登录
+- **POST** `/auth/wechat-login`
+- **参数**: `{ code, userInfo: { nickName, avatarUrl } }`
+
+### 1.2 手机号登录
+- **POST** `/auth/phone-login`
+- **参数**: `{ phone, code }`
+
+### 1.3 发送验证码
+- **POST** `/auth/send-code`
+- **参数**: `{ phone }`
+- **限流**: 60秒/次
+
+### 1.4 获取当前用户
+- **GET** `/auth/me` 🔐
+- **返回**: 用户信息
+
+### 1.5 更新个人资料
+- **PUT** `/auth/profile` 🔐
+- **参数**: `{ nickname?, avatar?, phone? }`
+
+---
+
+## 2. 案例模块 `/cases`
+
+### 2.1 获取案例列表
+- **GET** `/cases`
+- **查询参数**: `page, limit, style, roomType, minArea, maxArea, minPrice, maxPrice, search`
+
+### 2.2 获取案例详情
+- **GET** `/cases/:id`
+
+### 2.3 搜索案例
+- **GET** `/cases/search`
+- **查询参数**: `keyword, page, limit`
+
+### 2.4 获取热门案例
+- **GET** `/cases/hot`
+
+### 2.5 创建案例 (商家)
+- **POST** `/cases` 🔐🏪
+- **参数**: `{ title, description, images, style, roomType, area, price, designer, tags }`
+
+### 2.6 更新案例 (商家)
+- **PUT** `/cases/:id` 🔐🏪
+
+### 2.7 删除案例 (商家)
+- **DELETE** `/cases/:id` 🔐🏪
+
+---
+
+## 3. 日记模块 `/diaries`
+
+### 3.1 获取我的日记
+- **GET** `/diaries/my` 🔐
+- **查询参数**: `page, limit`
+
+### 3.2 获取日记详情
+- **GET** `/diaries/:id` 🔐
+
+### 3.3 创建日记
+- **POST** `/diaries` 🔐
+- **参数**: `{ title, content, images, stage, isPublic }`
+
+### 3.4 更新日记
+- **PUT** `/diaries/:id` 🔐
+
+### 3.5 删除日记
+- **DELETE** `/diaries/:id` 🔐
+
+### 3.6 获取日记统计
+- **GET** `/diaries/stats` 🔐
+
+---
+
+## 4. 收藏模块 `/favorites`
+
+### 4.1 获取收藏列表
+- **GET** `/favorites` 🔐
+- **查询参数**: `targetType, page, limit`
+
+### 4.2 添加收藏
+- **POST** `/favorites` 🔐
+- **参数**: `{ targetType: 'case'|'designer', targetId }`
+
+### 4.3 取消收藏
+- **DELETE** `/favorites/:targetType/:targetId` 🔐
+
+### 4.4 检查是否收藏
+- **GET** `/favorites/check/:targetType/:targetId` 🔐
+
+---
+
+## 5. 推荐模块 `/recommend`
+
+### 5.1 推荐案例
+- **GET** `/recommend/cases`
+
+### 5.2 推荐设计师
+- **GET** `/recommend/designers`
+
+### 5.3 相似案例
+- **GET** `/recommend/similar/:caseId`
+
+---
+
+## 6. 上传模块 `/upload`
+
+### 6.1 上传图片
+- **POST** `/upload/image` 🔐
+- **Content-Type**: `multipart/form-data`
+- **字段**: `image` (文件)
+- **返回**: `{ url }`
+
+---
+
+## 7. 商家模块 `/merchants`
+
+### 7.1 申请成为商家
+- **POST** `/merchants/apply` 🔐
+- **参数**: `{ companyName, businessLicense, contactPerson, contactPhone, address, description }`
+
+### 7.2 获取我的商家信息
+- **GET** `/merchants/my` 🔐🏪
+
+### 7.3 更新商家信息
+- **PUT** `/merchants/my` 🔐🏪
+
+### 7.4 添加设计师
+- **POST** `/merchants/designers` 🔐🏪
+- **参数**: `{ name, avatar, title, experience, specialties, introduction }`
+
+### 7.5 获取设计师列表
+- **GET** `/merchants/designers` 🔐🏪
+
+### 7.6 更新设计师
+- **PUT** `/merchants/designers/:id` 🔐🏪
+
+### 7.7 删除设计师
+- **DELETE** `/merchants/designers/:id` 🔐🏪
+
+---
+
+## 8. 聊天模块 `/chat`
+
+### 8.1 获取会话列表
+- **GET** `/chat/conversations` 🔐
+
+### 8.2 获取会话详情
+- **GET** `/chat/conversations/:id` 🔐
+
+### 8.3 创建会话
+- **POST** `/chat/conversations` 🔐
+- **参数**: `{ receiverId, caseId?, designerId? }`
+
+### 8.4 删除会话
+- **DELETE** `/chat/conversations/:id` 🔐
+
+### 8.5 获取消息历史
+- **GET** `/chat/conversations/:conversationId/messages` 🔐
+- **查询参数**: `page, limit`
+
+### 8.6 发送消息
+- **POST** `/chat/conversations/:conversationId/messages` 🔐
+- **参数**: `{ content, type?: 'text'|'image'|'file', mediaUrl? }`
+
+### 8.7 标记已读
+- **PUT** `/chat/conversations/:conversationId/read` 🔐
+
+### 8.8 获取未读数量
+- **GET** `/chat/unread-count` 🔐
+
+---
+
+## 9. 订单模块 `/orders`
+
+### 9.1 创建订单
+- **POST** `/orders` 🔐
+- **参数**:
+```json
+{
+  "merchant": "商家ID",
+  "designer": "设计师ID (可选)",
+  "case": "案例ID (可选)",
+  "projectName": "项目名称",
+  "projectAddress": "项目地址",
+  "projectArea": 120,
+  "projectStyle": "现代简约",
+  "projectRooms": "三室两厅",
+  "items": [
+    { "name": "项目名", "quantity": 1, "unit": "项", "unitPrice": 1000, "totalPrice": 1000 }
+  ],
+  "contactName": "联系人",
+  "contactPhone": "联系电话"
+}
+```
+
+### 9.2 获取我的订单
+- **GET** `/orders/my` 🔐
+- **查询参数**: `page, limit, status`
+
+### 9.3 获取订单详情
+- **GET** `/orders/:id` 🔐
+
+### 9.4 取消订单
+- **POST** `/orders/:id/cancel` 🔐
+- **参数**: `{ reason? }`
+
+### 9.5 商家：获取订单列表
+- **GET** `/orders/merchant/list` 🔐🏪
+- **查询参数**: `page, limit, status, paymentStatus`
+
+### 9.6 商家：更新订单状态
+- **PUT** `/orders/:id/status` 🔐🏪
+- **参数**: `{ status: 'confirmed'|'designing'|'constructing'|'completed', merchantNote? }`
+
+### 9.7 商家：添加支付记录
+- **POST** `/orders/:id/payment` 🔐🏪
+- **参数**: `{ amount, method: 'wechat'|'alipay'|'bank'|'cash', transactionId?, note? }`
+
+### 9.8 商家：获取订单统计
+- **GET** `/orders/merchant/stats` 🔐🏪
+
+---
+
+## 10. 评价模块 `/reviews`
+
+### 10.1 获取评价列表 (公开)
+- **GET** `/reviews/:targetType/:targetId`
+- **查询参数**: `page, limit, sort: 'newest'|'oldest'|'highest'|'lowest'|'popular'`
+
+### 10.2 创建评价
+- **POST** `/reviews` 🔐
+- **参数**: `{ targetType: 'case'|'merchant'|'order', targetId, orderId?, rating: 1-5, content, images?, tags?, isAnonymous? }`
+
+### 10.3 获取我的评价
+- **GET** `/reviews/my/list` 🔐
+
+### 10.4 点赞评价
+- **POST** `/reviews/:id/like` 🔐
+
+### 10.5 删除评价
+- **DELETE** `/reviews/:id` 🔐
+
+### 10.6 商家回复评价
+- **POST** `/reviews/:id/reply` 🔐🏪
+- **参数**: `{ content }`
+
+---
+
+## 11. 预约模块 `/appointments`
+
+### 11.1 获取可用时间槽 (公开)
+- **GET** `/appointments/slots`
+- **查询参数**: `merchantId, date`
+
+### 11.2 创建预约
+- **POST** `/appointments` 🔐
+- **参数**:
+```json
+{
+  "merchantId": "商家ID",
+  "designerId": "设计师ID (可选)",
+  "type": "consultation|site_visit|design_review|construction_check",
+  "date": "2024-01-20",
+  "timeSlot": "09:00-10:00",
+  "contactName": "联系人",
+  "contactPhone": "联系电话",
+  "address": "地址 (可选)",
+  "projectArea": 120,
+  "projectStyle": "现代简约",
+  "note": "备注"
+}
+```
+
+### 11.3 获取我的预约
+- **GET** `/appointments/my` 🔐
+- **查询参数**: `page, limit, status`
+
+### 11.4 获取预约详情
+- **GET** `/appointments/:id` 🔐
+
+### 11.5 取消预约
+- **POST** `/appointments/:id/cancel` 🔐
+- **参数**: `{ reason? }`
+
+### 11.6 商家：获取预约列表
+- **GET** `/appointments/merchant/list` 🔐🏪
+- **查询参数**: `page, limit, status, date`
+
+### 11.7 商家：更新预约状态
+- **PUT** `/appointments/:id/status` 🔐🏪
+- **参数**: `{ status: 'confirmed'|'cancelled'|'completed'|'no_show', merchantNote? }`
+
+---
+
+## 12. 管理后台 `/admin` 🔐👮
+
+### 12.1 获取仪表盘统计
+- **GET** `/admin/stats/dashboard`
+
+### 12.2 用户管理
+- **GET** `/admin/users` - 获取用户列表
+- **PUT** `/admin/users/:id` - 更新用户状态
+
+### 12.3 商家管理
+- **GET** `/admin/merchants` - 获取商家列表
+- **PUT** `/admin/merchants/:id/approve` - 审核商家
+
+### 12.4 订单管理
+- **GET** `/admin/orders` - 获取所有订单
+
+### 12.5 案例管理
+- **PUT** `/admin/cases/:id/status` - 更新案例状态
+
+---
+
+## 图例
+
+- 🔐 需要登录认证
+- 🏪 需要商家权限
+- 👮 需要管理员权限
+
+---
+
+## 状态码说明
 
 | 状态码 | 说明 |
 |--------|------|
-| 200 | 请求成功 |
+| 200 | 成功 |
+| 201 | 创建成功 |
 | 400 | 请求参数错误 |
 | 401 | 未授权 |
 | 403 | 禁止访问 |
 | 404 | 资源不存在 |
+| 429 | 请求过于频繁 |
 | 500 | 服务器错误 |
 
 ---
 
-## 1. 用户认证
-
-### 1.1 微信小程序登录
-
-**接口说明**: 用户使用微信小程序登录
-
-**请求方式**: `POST /auth/wechat-login`
-
-**请求参数**:
-
-```json
-{
-  "code": "021Abc123def",
-  "userInfo": {
-    "nickName": "张三",
-    "avatarUrl": "https://example.com/avatar.jpg"
-  }
-}
-```
-
-**参数说明**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| code | string | 是 | 微信登录凭证 |
-| userInfo | object | 是 | 用户信息 |
-| userInfo.nickName | string | 是 | 用户昵称 |
-| userInfo.avatarUrl | string | 是 | 用户头像 |
-
-**响应示例**:
-
-```json
-{
-  "code": 200,
-  "message": "登录成功",
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "userInfo": {
-      "id": "123456",
-      "nickname": "张三",
-      "avatar": "https://example.com/avatar.jpg",
-      "phone": "",
-      "isLogin": true
-    }
-  }
-}
-```
-
-**后端处理流程**:
-
-1. 使用 `code` 调用微信接口获取 `openid` 和 `session_key`
-   ```
-   GET https://api.weixin.qq.com/sns/jscode2session?appid=APPID&secret=SECRET&js_code=CODE&grant_type=authorization_code
-   ```
-
-2. 根据 `openid` 查询用户是否存在
-   - 如果存在：更新用户信息，生成 token
-   - 如果不存在：创建新用户，生成 token
-
-3. 返回 token 和用户信息
-
-### 1.2 手机号登录
-
-**接口说明**: 用户使用手机号和验证码登录
-
-**请求方式**: `POST /auth/phone-login`
-
-**请求参数**:
-
-```json
-{
-  "phone": "13800138000",
-  "code": "123456"
-}
-```
-
-**参数说明**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| phone | string | 是 | 手机号 |
-| code | string | 是 | 验证码 |
-
-**响应示例**:
-
-```json
-{
-  "code": 200,
-  "message": "登录成功",
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "userInfo": {
-      "id": "123456",
-      "nickname": "用户8000",
-      "avatar": "https://example.com/default-avatar.jpg",
-      "phone": "13800138000",
-      "isLogin": true
-    }
-  }
-}
-```
-
-### 1.3 发送验证码
-
-**接口说明**: 发送手机验证码
-
-**请求方式**: `POST /auth/send-code`
-
-**请求参数**:
-
-```json
-{
-  "phone": "13800138000"
-}
-```
-
-**响应示例**:
-
-```json
-{
-  "code": 200,
-  "message": "验证码已发送",
-  "data": {
-    "expire": 300
-  }
-}
-```
-
-### 1.4 获取用户信息
-
-**接口说明**: 获取当前登录用户信息
-
-**请求方式**: `GET /user/info`
-
-**请求头**:
+## 订单状态流转
 
 ```
-Authorization: Bearer {token}
+pending → confirmed → designing → constructing → completed
+    ↓         ↓           ↓            ↓
+ cancelled cancelled  cancelled   cancelled
 ```
 
-**响应示例**:
+## 预约类型说明
 
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "id": "123456",
-    "nickname": "张三",
-    "avatar": "https://example.com/avatar.jpg",
-    "phone": "13800138000",
-    "isLogin": true
-  }
-}
-```
+| 类型 | 说明 |
+|------|------|
+| consultation | 咨询 |
+| site_visit | 量房 |
+| design_review | 设计评审 |
+| construction_check | 工程检查 |
 
----
+## 预约状态说明
 
-## 2. 案例管理
-
-### 2.1 获取案例列表
-
-**接口说明**: 获取装修案例列表
-
-**请求方式**: `GET /cases`
-
-**请求参数**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| page | number | 否 | 页码，默认 1 |
-| pageSize | number | 否 | 每页数量，默认 10 |
-| style | string | 否 | 风格筛选：modern, nordic, chinese, luxury 等 |
-
-**响应示例**:
-
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "total": 100,
-    "page": 1,
-    "pageSize": 10,
-    "list": [
-      {
-        "id": 1,
-        "title": "现代简约 · 三居室",
-        "image": "https://example.com/case1.jpg",
-        "style": "现代简约",
-        "area": "120㎡",
-        "price": "15万",
-        "designer": "张设计师"
-      }
-    ]
-  }
-}
-```
-
-### 2.2 获取案例详情
-
-**接口说明**: 获取装修案例详细信息
-
-**请求方式**: `GET /cases/:id`
-
-**路径参数**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| id | number | 是 | 案例 ID |
-
-**响应示例**:
-
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "id": 1,
-    "title": "现代简约 · 三居室",
-    "style": "现代简约",
-    "area": "120㎡",
-    "price": "15万",
-    "images": [
-      "https://example.com/case1-1.jpg",
-      "https://example.com/case1-2.jpg"
-    ],
-    "description": "本案例采用现代简约风格...",
-    "tags": ["简约", "舒适", "温馨"],
-    "designer": {
-      "id": "1",
-      "name": "张设计师",
-      "avatar": "https://example.com/designer1.jpg",
-      "title": "首席设计师 · 10年经验"
-    },
-    "specs": [
-      { "label": "户型", "value": "三室两厅一卫" },
-      { "label": "面积", "value": "120㎡" }
-    ]
-  }
-}
-```
-
----
-
-## 3. 设计师管理
-
-### 3.1 获取设计师列表
-
-**接口说明**: 获取设计师列表
-
-**请求方式**: `GET /designers`
-
-**请求参数**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| page | number | 否 | 页码，默认 1 |
-| pageSize | number | 否 | 每页数量，默认 10 |
-
-**响应示例**:
-
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "total": 50,
-    "page": 1,
-    "pageSize": 10,
-    "list": [
-      {
-        "id": "1",
-        "name": "张设计师",
-        "avatar": "https://example.com/designer1.jpg",
-        "title": "首席设计师",
-        "experience": "10年经验",
-        "caseCount": 156,
-        "styles": ["现代简约", "北欧风"],
-        "rating": 4.9
-      }
-    ]
-  }
-}
-```
-
----
-
-## 4. 收藏管理
-
-### 4.1 收藏案例
-
-**接口说明**: 收藏装修案例
-
-**请求方式**: `POST /favorites`
-
-**请求头**:
-
-```
-Authorization: Bearer {token}
-```
-
-**请求参数**:
-
-```json
-{
-  "caseId": 1
-}
-```
-
-**响应示例**:
-
-```json
-{
-  "code": 200,
-  "message": "收藏成功",
-  "data": {}
-}
-```
-
-### 4.2 取消收藏
-
-**接口说明**: 取消收藏案例
-
-**请求方式**: `DELETE /favorites/:caseId`
-
-**请求头**:
-
-```
-Authorization: Bearer {token}
-```
-
-**响应示例**:
-
-```json
-{
-  "code": 200,
-  "message": "已取消收藏",
-  "data": {}
-}
-```
-
----
-
-## 5. 预约管理
-
-### 5.1 预约设计师
-
-**接口说明**: 预约设计师咨询
-
-**请求方式**: `POST /appointments`
-
-**请求头**:
-
-```
-Authorization: Bearer {token}
-```
-
-**请求参数**:
-
-```json
-{
-  "designerId": "1",
-  "phone": "13800138000",
-  "appointmentTime": "2024-01-15 14:00:00",
-  "message": "想咨询现代简约风格装修"
-}
-```
-
-**响应示例**:
-
-```json
-{
-  "code": 200,
-  "message": "预约成功",
-  "data": {
-    "id": "123",
-    "status": "pending"
-  }
-}
-```
-
----
-
-## 注意事项
-
-1. **Token 认证**: 需要登录的接口，请在请求头中携带 `Authorization: Bearer {token}`
-
-2. **微信登录**:
-   - AppID 和 AppSecret 需要在微信小程序后台获取
-   - code 有效期为 5 分钟，使用一次后失效
-   - 需要配置服务器域名白名单
-
-3. **验证码**:
-   - 验证码有效期建议 5 分钟
-   - 同一手机号 1 分钟内只能发送一次
-   - 建议接入第三方短信服务（阿里云、腾讯云等）
-
-4. **安全性**:
-   - 所有接口建议使用 HTTPS
-   - 敏感数据需要加密传输
-   - 实施接口限流和防刷策略
-
-## 相关资源
-
-- [微信小程序登录文档](https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/login.html)
-- [微信小程序授权文档](https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/authorize.html)
+| 状态 | 说明 |
+|------|------|
+| pending | 待确认 |
+| confirmed | 已确认 |
+| cancelled | 已取消 |
+| completed | 已完成 |
+| no_show | 未到场 |

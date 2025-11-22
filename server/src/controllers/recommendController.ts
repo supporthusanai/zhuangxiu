@@ -154,27 +154,28 @@ export const getRecommendedCases = async (
       .limit(Number(limit) * 3); // 多取一些用于排序
 
     // 如果有偏好，按相似度排序
+    let resultCases: any[];
     if (preference.hasHistory) {
-      cases = cases
+      resultCases = cases
         .map(c => ({
           ...c.toObject(),
           score: calculateSimilarityScore(c, preference, 'case'),
         }))
-        .sort((a, b) => b.score - a.score)
+        .sort((a: any, b: any) => b.score - a.score)
         .slice(0, Number(limit));
     } else {
       // 无偏好，返回热门案例
-      cases = cases
+      resultCases = cases
         .sort((a, b) => b.viewCount + b.favoriteCount - (a.viewCount + a.favoriteCount))
         .slice(0, Number(limit));
     }
 
     // 缓存结果（10分钟）
-    await redisClient.setEx(cacheKey, 600, JSON.stringify(cases));
+    await redisClient.setEx(cacheKey, 600, JSON.stringify(resultCases));
 
     res.status(200).json({
       success: true,
-      data: cases,
+      data: resultCases,
       fromCache: false,
     });
   } catch (error) {
@@ -224,27 +225,28 @@ export const getRecommendedDesigners = async (
     let designers = await Designer.find(query).limit(Number(limit) * 3);
 
     // 如果有偏好，按相似度排序
+    let resultDesigners: any[];
     if (preference.hasHistory) {
-      designers = designers
+      resultDesigners = designers
         .map(d => ({
           ...d.toObject(),
           score: calculateSimilarityScore(d, preference, 'designer'),
         }))
-        .sort((a, b) => b.score - a.score)
+        .sort((a: any, b: any) => b.score - a.score)
         .slice(0, Number(limit));
     } else {
       // 无偏好，返回热门设计师
-      designers = designers
+      resultDesigners = designers
         .sort((a, b) => b.rating * b.caseCount - a.rating * a.caseCount)
         .slice(0, Number(limit));
     }
 
     // 缓存结果（10分钟）
-    await redisClient.setEx(cacheKey, 600, JSON.stringify(designers));
+    await redisClient.setEx(cacheKey, 600, JSON.stringify(resultDesigners));
 
     res.status(200).json({
       success: true,
-      data: designers,
+      data: resultDesigners,
       fromCache: false,
     });
   } catch (error) {

@@ -132,5 +132,16 @@ CaseSchema.index({ viewCount: -1 });
 CaseSchema.index({ favoriteCount: -1 });
 CaseSchema.index({ createdAt: -1 });
 CaseSchema.index({ area: 1, price: 1 });
+CaseSchema.index({ status: 1, isHot: 1 });
+CaseSchema.index({ status: 1, isRecommended: 1 });
+
+// 全文搜索索引（支持中文搜索）
+CaseSchema.index(
+  { title: 'text', description: 'text', tags: 'text', style: 'text' },
+  {
+    weights: { title: 10, tags: 5, style: 3, description: 1 },
+    default_language: 'none', // 禁用语言特定的词干分析，更适合中文
+  }
+);
 
 export default mongoose.model<ICase>('Case', CaseSchema);

@@ -1,4 +1,4 @@
-import { View, Text, Input, ScrollView } from '@tarojs/components'
+import { View, Text, Input, ScrollView, Image } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useState, useEffect, useRef } from 'react'
 import './index.scss'
@@ -17,8 +17,9 @@ interface Message {
 }
 
 export default function Chat() {
-  const [userName, setUserName] = useState('')
-  const [chatTitle, setChatTitle] = useState('')
+  // These state variables store user/chat info for future use (e.g., sending to backend)
+  const [, setUserName] = useState('')
+  const [, setChatTitle] = useState('')
   const [inputText, setInputText] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
 
@@ -31,8 +32,7 @@ export default function Chat() {
 
     // 根据不同类型初始化聊天内容
     if (type === 'case') {
-      // 从案例详情进入
-      const caseId = params?.caseId || '1'
+      // 从案例详情进入 (caseId available in params?.caseId for backend)
       const caseTitle = decodeURIComponent(params?.caseTitle || '案例')
       const designerName = decodeURIComponent(params?.designerName || '设计师')
       title = designerName
@@ -57,8 +57,7 @@ export default function Chat() {
       ]
       setMessages(initialMessages)
     } else if (type === 'designer') {
-      // 从设计师列表/详情进入
-      const designerId = params?.designerId || '1'
+      // 从设计师列表/详情进入 (designerId available in params?.designerId for backend)
       const designerName = decodeURIComponent(params?.designerName || '设计师')
       title = designerName
       setChatTitle(designerName)
@@ -82,14 +81,12 @@ export default function Chat() {
       ]
       setMessages(initialMessages)
     } else if (type === 'inquiry') {
-      // 从咨询列表进入（商家端）
-      const inquiryId = params?.inquiryId || ''
-      const userId = params?.userId || ''
-      const userName = decodeURIComponent(params?.userName || '用户')
+      // 从咨询列表进入（商家端）(inquiryId, userId available in params for backend)
+      const inquiryUserName = decodeURIComponent(params?.userName || '用户')
       const caseTitle = params?.caseTitle ? decodeURIComponent(params.caseTitle) : ''
-      title = userName
-      setChatTitle(userName)
-      setUserName(userName)
+      title = inquiryUserName
+      setChatTitle(inquiryUserName)
+      setUserName(inquiryUserName)
 
       // 加载历史消息（实际应该从后端获取）
       const initialMessages: Message[] = [
@@ -134,10 +131,10 @@ export default function Chat() {
       setMessages(initialMessages)
     } else {
       // 默认情况
-      const userName = decodeURIComponent(params?.userName || '用户')
-      title = userName
-      setChatTitle(userName)
-      setUserName(userName)
+      const defaultUserName = decodeURIComponent(params?.userName || '用户')
+      title = defaultUserName
+      setChatTitle(defaultUserName)
+      setUserName(defaultUserName)
       setMessages([])
     }
 
@@ -241,7 +238,7 @@ export default function Chat() {
 
               {message.type === 'image' && (
                 <View className='message-image'>
-                  <image src={message.content} mode='widthFix' />
+                  <Image src={message.content} mode='widthFix' />
                 </View>
               )}
 
@@ -250,7 +247,7 @@ export default function Chat() {
                   className='message-case'
                   onClick={() => handleViewCase(message.caseInfo!.id)}
                 >
-                  <image
+                  <Image
                     src={message.caseInfo.image}
                     className='case-image'
                     mode='aspectFill'

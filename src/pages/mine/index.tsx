@@ -3,7 +3,6 @@ import Taro from '@tarojs/taro'
 import { useState, useEffect } from 'react'
 import { getUserInfo, logout, UserInfo } from '@/utils/user'
 import {
-  getMerchantInfo,
   getMerchantStatus,
   getMerchantStatusName,
   MerchantStatus

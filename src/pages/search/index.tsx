@@ -1,29 +1,37 @@
 import { View, Text, Image, Input } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
+import { searchCases, getCases } from '@/services/api'
 import './index.scss'
 
 type TabType = 'cases' | 'designers'
 
 interface Case {
-  id: number
+  _id: string
   title: string
   style: string
-  area: string
-  price: string
-  image: string
-  designer: string
+  area: number
+  budget: number
+  images: string[]
+  designer?: {
+    name: string
+  }
+  merchant?: {
+    companyName: string
+  }
 }
 
 interface Designer {
-  id: number
-  name: string
-  avatar: string
-  title: string
-  experience: string
-  specialties: string[]
-  caseCount: number
-  rating: number
+  _id: string
+  name?: string
+  companyName?: string
+  avatar?: string
+  logo?: string
+  title?: string
+  experience?: number
+  specialties?: string[]
+  caseCount?: number
+  rating?: number
 }
 
 const SEARCH_HISTORY_KEY = 'searchHistory'
@@ -34,109 +42,9 @@ export default function Search() {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [searchHistory, setSearchHistory] = useState<string[]>([])
   const [isSearching, setIsSearching] = useState(false)
-
-  // 模拟案例数据
-  const allCases: Case[] = [
-    {
-      id: 1,
-      title: '现代简约风格三居室',
-      style: '现代简约',
-      area: '120㎡',
-      price: '15万',
-      image: 'https://via.placeholder.com/300x200/667eea/ffffff?text=现代简约',
-      designer: '张设计师'
-    },
-    {
-      id: 2,
-      title: '北欧风格小户型',
-      style: '北欧风格',
-      area: '80㎡',
-      price: '10万',
-      image: 'https://via.placeholder.com/300x200/764ba2/ffffff?text=北欧风格',
-      designer: '李设计师'
-    },
-    {
-      id: 3,
-      title: '中式古典别墅',
-      style: '中式风格',
-      area: '300㎡',
-      price: '50万',
-      image: 'https://via.placeholder.com/300x200/52c41a/ffffff?text=中式古典',
-      designer: '王设计师'
-    },
-    {
-      id: 4,
-      title: '工业风格loft',
-      style: '工业风格',
-      area: '150㎡',
-      price: '20万',
-      image: 'https://via.placeholder.com/300x200/faad14/ffffff?text=工业风格',
-      designer: '赵设计师'
-    },
-    {
-      id: 5,
-      title: '地中海风格复式',
-      style: '地中海',
-      area: '200㎡',
-      price: '30万',
-      image: 'https://via.placeholder.com/300x200/1890ff/ffffff?text=地中海',
-      designer: '刘设计师'
-    }
-  ]
-
-  // 模拟设计师数据
-  const allDesigners: Designer[] = [
-    {
-      id: 1,
-      name: '张设计师',
-      avatar: 'https://via.placeholder.com/120x120/667eea/ffffff?text=张',
-      title: '首席设计师',
-      experience: '10年经验',
-      specialties: ['现代简约', '北欧风格'],
-      caseCount: 156,
-      rating: 4.9
-    },
-    {
-      id: 2,
-      name: '李设计师',
-      avatar: 'https://via.placeholder.com/120x120/764ba2/ffffff?text=李',
-      title: '高级设计师',
-      experience: '8年经验',
-      specialties: ['中式风格', '新中式'],
-      caseCount: 98,
-      rating: 4.8
-    },
-    {
-      id: 3,
-      name: '王设计师',
-      avatar: 'https://via.placeholder.com/120x120/52c41a/ffffff?text=王',
-      title: '资深设计师',
-      experience: '12年经验',
-      specialties: ['欧式古典', '法式风格'],
-      caseCount: 203,
-      rating: 5.0
-    },
-    {
-      id: 4,
-      name: '赵设计师',
-      avatar: 'https://via.placeholder.com/120x120/faad14/ffffff?text=赵',
-      title: '设计总监',
-      experience: '15年经验',
-      specialties: ['工业风格', '美式风格'],
-      caseCount: 267,
-      rating: 4.9
-    },
-    {
-      id: 5,
-      name: '刘设计师',
-      avatar: 'https://via.placeholder.com/120x120/1890ff/ffffff?text=刘',
-      title: '主任设计师',
-      experience: '7年经验',
-      specialties: ['地中海', '田园风格'],
-      caseCount: 76,
-      rating: 4.7
-    }
-  ]
+  const [loading, setLoading] = useState(false)
+  const [cases, setCases] = useState<Case[]>([])
+  const [designers, setDesigners] = useState<Designer[]>([])
 
   // 热门搜索关键词
   const hotKeywords = [
@@ -202,7 +110,7 @@ export default function Search() {
     })
   }
 
-  const handleSearch = (keyword?: string) => {
+  const handleSearch = async (keyword?: string) => {
     const searchText = keyword || searchKeyword
     if (!searchText.trim()) {
       Taro.showToast({
@@ -216,6 +124,30 @@ export default function Search() {
     saveSearchHistory(searchText)
     setSearchKeyword(searchText)
     setIsSearching(true)
+    setLoading(true)
+
+    try {
+      // 搜索案例
+      const casesRes = await searchCases({ keyword: searchText, limit: 20 })
+      if (casesRes.success && casesRes.data) {
+        const caseList = casesRes.data.cases || casesRes.data.list || []
+        setCases(caseList)
+      }
+
+      // 搜索设计师/商家 (使用 style 过滤来模拟搜索)
+      // 实际上如果后端支持商家搜索API会更好
+      // 这里暂时只显示案例结果
+      setDesigners([])
+    } catch (error) {
+      console.error('搜索失败:', error)
+      Taro.showToast({
+        title: '搜索失败',
+        icon: 'none',
+        duration: 1500
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleKeywordClick = (keyword: string) => {
@@ -226,38 +158,17 @@ export default function Search() {
   const handleClearSearch = () => {
     setSearchKeyword('')
     setIsSearching(false)
+    setCases([])
+    setDesigners([])
   }
 
-  // 过滤案例
-  const filteredCases = useMemo(() => {
-    if (!searchKeyword.trim()) return []
-    const keyword = searchKeyword.toLowerCase()
-    return allCases.filter(item =>
-      item.title.toLowerCase().includes(keyword) ||
-      item.style.toLowerCase().includes(keyword) ||
-      item.area.toLowerCase().includes(keyword) ||
-      item.designer.toLowerCase().includes(keyword)
-    )
-  }, [searchKeyword])
-
-  // 过滤设计师
-  const filteredDesigners = useMemo(() => {
-    if (!searchKeyword.trim()) return []
-    const keyword = searchKeyword.toLowerCase()
-    return allDesigners.filter(item =>
-      item.name.toLowerCase().includes(keyword) ||
-      item.title.toLowerCase().includes(keyword) ||
-      item.specialties.some(s => s.toLowerCase().includes(keyword))
-    )
-  }, [searchKeyword])
-
-  const handleCaseDetail = (id: number) => {
+  const handleCaseDetail = (id: string) => {
     Taro.navigateTo({
       url: `/pages/case-detail/index?id=${id}`
     })
   }
 
-  const handleDesignerDetail = (id: number) => {
+  const handleDesignerDetail = (id: string) => {
     Taro.navigateTo({
       url: `/pages/designer-detail/index?id=${id}`
     })
@@ -348,8 +259,8 @@ export default function Search() {
               onClick={() => setActiveTab('cases')}
             >
               <Text className='tab-text'>案例</Text>
-              {filteredCases.length > 0 && (
-                <Text className='tab-count'>({filteredCases.length})</Text>
+              {cases.length > 0 && (
+                <Text className='tab-count'>({cases.length})</Text>
               )}
             </View>
             <View
@@ -357,37 +268,46 @@ export default function Search() {
               onClick={() => setActiveTab('designers')}
             >
               <Text className='tab-text'>设计师</Text>
-              {filteredDesigners.length > 0 && (
-                <Text className='tab-count'>({filteredDesigners.length})</Text>
+              {designers.length > 0 && (
+                <Text className='tab-count'>({designers.length})</Text>
               )}
             </View>
           </View>
 
+          {/* 加载中 */}
+          {loading && (
+            <View className='loading-state'>
+              <Text>搜索中...</Text>
+            </View>
+          )}
+
           {/* 案例结果 */}
-          {activeTab === 'cases' && (
+          {!loading && activeTab === 'cases' && (
             <View className='cases-list'>
-              {filteredCases.map(item => (
+              {cases.map(item => (
                 <View
-                  key={item.id}
+                  key={item._id}
                   className='case-item'
-                  onClick={() => handleCaseDetail(item.id)}
+                  onClick={() => handleCaseDetail(item._id)}
                 >
-                  <Image src={item.image} className='case-image' mode='aspectFill' />
+                  <Image src={item.images?.[0] || ''} className='case-image' mode='aspectFill' />
                   <View className='case-info'>
                     <View className='case-title'>{item.title}</View>
                     <View className='case-meta'>
-                      <Text className='meta-item'>{item.style}</Text>
+                      <Text className='meta-item'>{item.style || '-'}</Text>
                       <Text className='meta-divider'>·</Text>
-                      <Text className='meta-item'>{item.area}</Text>
+                      <Text className='meta-item'>{item.area ? `${item.area}㎡` : '-'}</Text>
                       <Text className='meta-divider'>·</Text>
-                      <Text className='meta-item'>{item.price}</Text>
+                      <Text className='meta-item'>{item.budget ? `${item.budget}万` : '-'}</Text>
                     </View>
-                    <View className='case-designer'>设计师：{item.designer}</View>
+                    <View className='case-designer'>
+                      设计师：{item.designer?.name || item.merchant?.companyName || '-'}
+                    </View>
                   </View>
                 </View>
               ))}
 
-              {filteredCases.length === 0 && (
+              {cases.length === 0 && (
                 <View className='empty-state'>
                   <Text className='empty-icon'>🔍</Text>
                   <Text className='empty-text'>未找到相关案例</Text>
@@ -398,37 +318,43 @@ export default function Search() {
           )}
 
           {/* 设计师结果 */}
-          {activeTab === 'designers' && (
+          {!loading && activeTab === 'designers' && (
             <View className='designers-list'>
-              {filteredDesigners.map(item => (
+              {designers.map(item => (
                 <View
-                  key={item.id}
+                  key={item._id}
                   className='designer-item'
-                  onClick={() => handleDesignerDetail(item.id)}
+                  onClick={() => handleDesignerDetail(item._id)}
                 >
-                  <Image src={item.avatar} className='designer-avatar' mode='aspectFill' />
+                  <Image
+                    src={item.avatar || item.logo || ''}
+                    className='designer-avatar'
+                    mode='aspectFill'
+                  />
                   <View className='designer-info'>
-                    <View className='designer-name'>{item.name}</View>
+                    <View className='designer-name'>{item.name || item.companyName || '-'}</View>
                     <View className='designer-meta'>
-                      <Text className='meta-text'>{item.title}</Text>
+                      <Text className='meta-text'>{item.title || '设计师'}</Text>
                       <Text className='meta-divider'>·</Text>
-                      <Text className='meta-text'>{item.experience}</Text>
+                      <Text className='meta-text'>
+                        {item.experience ? `${item.experience}年经验` : '-'}
+                      </Text>
                     </View>
                     <View className='designer-specialties'>
-                      {item.specialties.map((specialty, index) => (
+                      {(item.specialties || []).map((specialty, index) => (
                         <Text key={index} className='specialty-tag'>{specialty}</Text>
                       ))}
                     </View>
                     <View className='designer-stats'>
-                      <Text className='stat-text'>{item.caseCount} 案例</Text>
+                      <Text className='stat-text'>{item.caseCount || 0} 案例</Text>
                       <Text className='stat-divider'>|</Text>
-                      <Text className='stat-text'>{item.rating} 评分</Text>
+                      <Text className='stat-text'>{item.rating || '-'} 评分</Text>
                     </View>
                   </View>
                 </View>
               ))}
 
-              {filteredDesigners.length === 0 && (
+              {designers.length === 0 && (
                 <View className='empty-state'>
                   <Text className='empty-icon'>👨‍🎨</Text>
                   <Text className='empty-text'>未找到相关设计师</Text>

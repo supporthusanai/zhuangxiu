@@ -67,7 +67,7 @@ export default function MerchantCases() {
     })
   }
 
-  const handleDeleteCase = (caseId: number, title: string) => {
+  const handleDeleteCase = (_caseId: number, title: string) => {
     Taro.showModal({
       title: '删除案例',
       content: `确定要删除「${title}」吗？`,
@@ -85,7 +85,7 @@ export default function MerchantCases() {
     })
   }
 
-  const handlePublishCase = (caseId: number) => {
+  const handlePublishCase = (_caseId: number) => {
     Taro.showModal({
       title: '发布案例',
       content: '确定要发布该案例吗？',

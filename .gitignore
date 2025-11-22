@@ -45,3 +45,6 @@ logs
 # cache
 .eslintcache
 .stylelintcache
+.swc/
+web/dist
+admin/dist

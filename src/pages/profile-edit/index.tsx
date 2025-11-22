@@ -69,12 +69,13 @@ export default function ProfileEdit() {
 
     const userInfo = getUserInfo()
     const updatedUserInfo: UserInfo = {
-      ...userInfo,
+      id: userInfo?.id || '',
       avatar,
       nickname: nickname.trim(),
       gender,
       region,
       signature,
+      phone: userInfo?.phone,
       isLogin: true
     }
 

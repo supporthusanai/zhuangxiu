@@ -6,11 +6,12 @@ export interface IUser extends Document {
   avatar?: string;
   phone?: string;
   openid?: string;
-  password?: string; // 可选：用于未来可能的密码登录功能
+  password?: string;
   gender?: 'male' | 'female' | 'unknown';
   region?: string;
   signature?: string;
   role: 'user' | 'merchant' | 'admin';
+  merchantId?: mongoose.Types.ObjectId;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -64,6 +65,10 @@ const UserSchema = new Schema<IUser>(
       enum: ['user', 'merchant', 'admin'],
       default: 'user',
     },
+    merchantId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Merchant',
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -78,6 +83,7 @@ const UserSchema = new Schema<IUser>(
 UserSchema.index({ phone: 1 });
 UserSchema.index({ openid: 1 });
 UserSchema.index({ createdAt: -1 });
+UserSchema.index({ merchantId: 1 });
 
 // Pre-save 钩子：密码加密
 UserSchema.pre('save', async function (next) {
@@ -95,7 +101,7 @@ UserSchema.pre('save', async function (next) {
   }
 });
 
-// 方法：比较密码（用于密码登录）
+// 方法：比较密码
 UserSchema.methods.comparePassword = async function (
   candidatePassword: string
 ): Promise<boolean> {

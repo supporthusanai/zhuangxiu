@@ -205,10 +205,39 @@ export const uploadMultipleImages = upload.array('images', 9);
 // 单个文件上传
 export const uploadSingleFile = upload.single('file');
 
+// 验证文件路径安全性（防止路径遍历攻击）
+const isPathSafe = (filePath: string): boolean => {
+  const normalizedPath = path.normalize(filePath);
+  // 禁止路径遍历和绝对路径
+  if (normalizedPath.includes('..') || path.isAbsolute(normalizedPath)) {
+    return false;
+  }
+  // 必须在 uploads 目录下
+  if (!normalizedPath.startsWith(uploadDir)) {
+    return false;
+  }
+  return true;
+};
+
 // 删除文件
 export const deleteFile = (filePath: string): boolean => {
   try {
+    // 验证路径安全性
+    if (!isPathSafe(filePath)) {
+      logger.warn('尝试删除非法路径的文件', { filePath });
+      return false;
+    }
+
     const fullPath = path.join(process.cwd(), filePath);
+    const resolvedPath = path.resolve(fullPath);
+    const uploadsRoot = path.resolve(uploadPath);
+
+    // 确保解析后的路径在上传目录内
+    if (!resolvedPath.startsWith(uploadsRoot)) {
+      logger.warn('路径遍历攻击尝试', { filePath, resolvedPath });
+      return false;
+    }
+
     if (fs.existsSync(fullPath)) {
       fs.unlinkSync(fullPath);
       return true;

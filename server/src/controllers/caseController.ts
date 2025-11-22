@@ -4,6 +4,7 @@ import BrowseHistory from '../models/BrowseHistory';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { redisClient } from '../config/database';
+import { escapeRegex, validatePagination, validateSortField } from '../utils/sanitize';
 
 // 获取案例列表
 export const getCases = async (
@@ -11,21 +12,15 @@ export const getCases = async (
   res: Response
 ): Promise<void> => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      style,
-      minArea,
-      maxArea,
-      minPrice,
-      maxPrice,
-      sort = 'createdAt',
-      order = 'desc',
-    } = req.query;
+    const { style, minArea, maxArea, minPrice, maxPrice, order = 'desc', merchantId } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
+    const allowedSortFields = ['createdAt', 'viewCount', 'favoriteCount', 'price', 'area'];
+    const sortField = validateSortField(req.query.sort as string, allowedSortFields);
 
     // 构建查询条件
     const query: any = { status: 'published' };
 
+    if (merchantId) query.merchant = merchantId;
     if (style) query.style = style;
     if (minArea || maxArea) {
       query.area = {};
@@ -41,10 +36,7 @@ export const getCases = async (
     // 构建排序
     const sortOrder = order === 'asc' ? 1 : -1;
     const sortObj: any = {};
-    sortObj[sort as string] = sortOrder;
-
-    // 分页
-    const skip = (Number(page) - 1) * Number(limit);
+    sortObj[sortField] = sortOrder;
 
     // 查询
     const [cases, total] = await Promise.all([
@@ -52,7 +44,7 @@ export const getCases = async (
         .populate('designer', 'name avatar title')
         .sort(sortObj)
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(limit),
       Case.countDocuments(query),
     ]);
 
@@ -96,13 +88,22 @@ export const getCaseById = async (
     caseDetail.viewCount += 1;
     await caseDetail.save();
 
-    // 记录浏览历史（如果用户已登录）
+    // 记录浏览历史（如果用户已登录）- 使用 upsert 避免重复
     if (req.userId) {
-      await BrowseHistory.create({
-        user: req.userId,
-        targetType: 'case',
-        targetId: id,
-      });
+      await BrowseHistory.findOneAndUpdate(
+        {
+          user: req.userId,
+          targetType: 'case',
+          targetId: id,
+        },
+        {
+          $set: { createdAt: new Date() }, // 更新时间戳
+        },
+        {
+          upsert: true,
+          new: true,
+        }
+      );
     }
 
     res.status(200).json({
@@ -117,39 +118,66 @@ export const getCaseById = async (
   }
 };
 
-// 搜索案例
+// 搜索案例（支持全文搜索和正则搜索）
 export const searchCases = async (
   req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
-    const { keyword, page = 1, limit = 10 } = req.query;
+    const { keyword } = req.query;
+    const { page, limit, skip } = validatePagination(req.query.page, req.query.limit);
 
     if (!keyword) {
       throw new AppError('搜索关键词不能为空', 400);
     }
 
-    // 构建搜索查询
-    const searchQuery = {
-      status: 'published',
-      $or: [
-        { title: { $regex: keyword as string, $options: 'i' } },
-        { description: { $regex: keyword as string, $options: 'i' } },
-        { style: { $regex: keyword as string, $options: 'i' } },
-        { tags: { $regex: keyword as string, $options: 'i' } },
-      ],
-    };
+    const searchKeyword = keyword as string;
+    const escapedKeyword = escapeRegex(searchKeyword);
 
-    const skip = (Number(page) - 1) * Number(limit);
+    let cases: any[];
+    let total: number;
 
-    const [cases, total] = await Promise.all([
-      Case.find(searchQuery)
+    try {
+      // 优先尝试全文搜索（更高效）
+      const textSearchQuery = {
+        status: 'published',
+        $text: { $search: searchKeyword },
+      };
+
+      const textSearchResults = await Case.find(textSearchQuery)
+        .select({ score: { $meta: 'textScore' } })
         .populate('designer', 'name avatar title')
-        .sort({ viewCount: -1, createdAt: -1 })
+        .sort({ score: { $meta: 'textScore' }, viewCount: -1 })
         .skip(skip)
-        .limit(Number(limit)),
-      Case.countDocuments(searchQuery),
-    ]);
+        .limit(limit);
+
+      if (textSearchResults.length > 0) {
+        cases = textSearchResults;
+        total = await Case.countDocuments(textSearchQuery);
+      } else {
+        throw new Error('No text search results');
+      }
+    } catch {
+      // 回退到正则搜索（使用转义后的关键词防止注入）
+      const regexQuery = {
+        status: 'published',
+        $or: [
+          { title: { $regex: escapedKeyword, $options: 'i' } },
+          { description: { $regex: escapedKeyword, $options: 'i' } },
+          { style: { $regex: escapedKeyword, $options: 'i' } },
+          { tags: { $regex: escapedKeyword, $options: 'i' } },
+        ],
+      };
+
+      [cases, total] = await Promise.all([
+        Case.find(regexQuery)
+          .populate('designer', 'name avatar title')
+          .sort({ viewCount: -1, createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+        Case.countDocuments(regexQuery),
+      ]);
+    }
 
     res.status(200).json({
       success: true,

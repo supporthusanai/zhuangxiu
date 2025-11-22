@@ -22,11 +22,26 @@ const app: Application = express();
 const httpServer = createServer(app);
 const PORT = envConfig.PORT;
 
+// CORS 配置
+const getCorsOrigin = (): string | string[] | boolean => {
+  const origins = envConfig.ALLOWED_ORIGINS;
+  if (envConfig.NODE_ENV === 'production') {
+    if (!origins) {
+      logger.warn('警告：生产环境未配置 ALLOWED_ORIGINS，将拒绝所有跨域请求');
+      return false;
+    }
+    return origins.split(',').map(o => o.trim());
+  }
+  return origins ? origins.split(',').map(o => o.trim()) : true;
+};
+
 // 中间件（顺序很重要）
 app.use(helmet()); // 安全头
 app.use(cors({
-  origin: envConfig.ALLOWED_ORIGINS,
+  origin: getCorsOrigin(),
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(compression()); // 响应压缩
 
@@ -90,7 +105,7 @@ const startServer = async (): Promise<void> => {
 ║   端口：${PORT}
 ║   时间：${new Date().toLocaleString('zh-CN')}
 ║   Socket.io: ✅ 已启用
-║   API 文档: http://localhost:${PORT}/api-docs
+║   API 文档: http://${process.env.HOST || 'localhost'}:${PORT}/api-docs
 ║                                            ║
 ╚════════════════════════════════════════════╝
       `);

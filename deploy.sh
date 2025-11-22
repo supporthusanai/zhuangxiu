@@ -1,0 +1,1666 @@
+#!/bin/bash
+
+#===============================================================================
+# 装修小程序 - 一键部署脚本
+# 支持开发环境和生产环境，零停机部署
+#===============================================================================
+
+set -e
+
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# 项目配置
+PROJECT_NAME="zhuangxiu"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SERVER_DIR="${PROJECT_DIR}/server"
+ADMIN_DIR="${PROJECT_DIR}/admin"
+WEB_DIR="${PROJECT_DIR}/web"
+MINIAPP_DIR="${PROJECT_DIR}"
+BACKUP_DIR="${PROJECT_DIR}/backups"
+LOG_DIR="${PROJECT_DIR}/logs"
+NGINX_CONF_DIR="/etc/nginx/sites-available"
+PM2_APP_NAME="zhuangxiu-api"
+
+# 默认端口
+API_PORT=3000
+ADMIN_PORT=8080
+
+#===============================================================================
+# 工具函数
+#===============================================================================
+
+print_banner() {
+    echo -e "${CYAN}"
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║                    装修小程序部署系统                        ║"
+    echo "║                  Zero-Downtime Deployment                    ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+}
+
+print_menu() {
+    echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}请选择操作:${NC}\n"
+    echo -e "  ${GREEN}[开发环境]${NC}"
+    echo "    1) 启动全部开发服务"
+    echo "    2) 仅启动后端 API"
+    echo "    3) 仅启动管理后台"
+    echo "    4) 启动小程序 (微信)"
+    echo "    5) 启动 PC 端网站"
+    echo "    6) 停止开发环境"
+    echo ""
+    echo -e "  ${PURPLE}[生产环境]${NC}"
+    echo "    7) 部署生产环境 (零停机)"
+    echo "    8) 重启生产服务"
+    echo "    9) 停止生产服务"
+    echo ""
+    echo -e "  ${CYAN}[服务管理]${NC}"
+    echo "   10) 查看服务状态"
+    echo "   11) 查看实时日志"
+    echo "   12) 健康检查"
+    echo ""
+    echo -e "  ${YELLOW}[数据库管理]${NC}"
+    echo "   13) 备份数据库"
+    echo "   14) 恢复数据库"
+    echo ""
+    echo -e "  ${RED}[系统管理]${NC}"
+    echo "   15) 初始化环境"
+    echo "   16) 项目初始化向导（安装依赖、创建管理员）"
+    echo "   17) 更新SSL证书"
+    echo "   18) 清理日志"
+    echo "   19) Docker Compose 管理"
+    echo ""
+    echo "    0) 退出"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+}
+
+log_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+log_step() {
+    echo -e "${CYAN}[STEP]${NC} $1"
+}
+
+confirm() {
+    read -p "$(echo -e ${YELLOW}$1 [y/N]: ${NC})" response
+    case "$response" in
+        [yY][eE][sS]|[yY]) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+check_command() {
+    if ! command -v $1 &> /dev/null; then
+        log_error "$1 未安装"
+        return 1
+    fi
+    return 0
+}
+
+# 检查并切换 Node.js 版本
+check_node_version() {
+    local required_major=20
+    local current_version=$(node -v 2>/dev/null | sed 's/v//')
+    local current_major=$(echo "$current_version" | cut -d. -f1)
+
+    if [ -z "$current_version" ]; then
+        log_error "Node.js 未安装"
+        return 1
+    fi
+
+    if [ "$current_major" -ge "$required_major" ]; then
+        log_info "Node.js 版本: v${current_version} ✓"
+        return 0
+    fi
+
+    log_warn "Node.js 版本过低: v${current_version} (需要 >= ${required_major})"
+
+    # 检查 nvm 是否可用
+    if [ -f "$HOME/.nvm/nvm.sh" ]; then
+        log_info "检测到 nvm，尝试切换版本..."
+
+        # 加载 nvm
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+        # 检查是否有 Node 20+
+        local available_version=$(nvm ls --no-colors 2>/dev/null | grep -oE 'v(2[0-9]|[3-9][0-9])\.[0-9]+\.[0-9]+' | head -1)
+
+        if [ -n "$available_version" ]; then
+            log_info "切换到 ${available_version}..."
+            nvm use "${available_version}" > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+                log_info "已切换到 Node.js ${available_version} ✓"
+                return 0
+            fi
+        fi
+
+        # 没有合适版本，尝试安装
+        log_info "安装 Node.js ${required_major}..."
+        nvm install ${required_major} > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            nvm use ${required_major} > /dev/null 2>&1
+            log_info "已安装并切换到 Node.js ${required_major} ✓"
+            return 0
+        fi
+    fi
+
+    # 检查 fnm
+    if command -v fnm &> /dev/null; then
+        log_info "检测到 fnm，尝试切换版本..."
+        eval "$(fnm env)" 2>/dev/null
+
+        if fnm use ${required_major} > /dev/null 2>&1; then
+            log_info "已切换到 Node.js ${required_major} ✓"
+            return 0
+        fi
+
+        log_info "安装 Node.js ${required_major}..."
+        if fnm install ${required_major} > /dev/null 2>&1; then
+            fnm use ${required_major} > /dev/null 2>&1
+            log_info "已安装并切换到 Node.js ${required_major} ✓"
+            return 0
+        fi
+    fi
+
+    # 检查 n
+    if command -v n &> /dev/null; then
+        log_info "检测到 n，尝试切换版本..."
+        if sudo n ${required_major} > /dev/null 2>&1; then
+            log_info "已切换到 Node.js ${required_major} ✓"
+            return 0
+        fi
+    fi
+
+    log_warn "无法自动切换 Node.js 版本，请手动升级到 v${required_major}+"
+    log_warn "推荐使用 nvm: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash"
+    log_warn "然后运行: nvm install ${required_major} && nvm use ${required_major}"
+
+    # 不阻止执行，只是警告
+    return 0
+}
+
+#===============================================================================
+# 环境检查
+#===============================================================================
+
+check_dependencies() {
+    log_step "检查依赖..."
+
+    local missing=()
+
+    check_command "node" || missing+=("node")
+    check_command "npm" || missing+=("npm")
+    check_command "pm2" || missing+=("pm2")
+    check_command "nginx" || missing+=("nginx")
+    check_command "mongod" || missing+=("mongodb")
+    check_command "redis-server" || missing+=("redis")
+
+    if [ ${#missing[@]} -ne 0 ]; then
+        log_error "缺少依赖: ${missing[*]}"
+        echo ""
+        echo "请安装缺失的依赖:"
+        echo "  Node.js: curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt install -y nodejs"
+        echo "  PM2: npm install -g pm2"
+        echo "  Nginx: sudo apt install -y nginx"
+        echo "  MongoDB: sudo apt install -y mongodb"
+        echo "  Redis: sudo apt install -y redis-server"
+        return 1
+    fi
+
+    log_info "所有依赖已安装 ✓"
+    return 0
+}
+
+check_services() {
+    log_step "检查服务状态..."
+
+    # MongoDB - 使用多种方式检测
+    local mongo_running=false
+    # 方式1: 尝试连接 MongoDB
+    if command -v mongosh &> /dev/null && mongosh --eval "db.runCommand({ping:1})" --quiet 2>/dev/null | grep -q "ok"; then
+        mongo_running=true
+    # 方式2: 使用旧版 mongo 客户端
+    elif command -v mongo &> /dev/null && mongo --eval "db.runCommand({ping:1})" --quiet 2>/dev/null | grep -q "ok"; then
+        mongo_running=true
+    # 方式3: 检查 systemctl 服务状态
+    elif systemctl is-active --quiet mongod 2>/dev/null; then
+        mongo_running=true
+    # 方式4: 检查进程（支持多种进程名）
+    elif pgrep -x mongod > /dev/null 2>&1 || pgrep -x mongodb > /dev/null 2>&1; then
+        mongo_running=true
+    # 方式5: 检查端口是否被监听
+    elif netstat -tuln 2>/dev/null | grep -q ":27017 " || ss -tuln 2>/dev/null | grep -q ":27017 "; then
+        mongo_running=true
+    fi
+
+    if [ "$mongo_running" = true ]; then
+        log_info "MongoDB: 运行中 ✓"
+    else
+        log_warn "MongoDB: 未运行"
+        if confirm "是否启动 MongoDB?"; then
+            sudo systemctl start mongod 2>/dev/null || mongod --fork --logpath /var/log/mongodb.log
+        fi
+    fi
+
+    # Redis - 使用多种方式检测
+    local redis_running=false
+    # 方式1: 使用 redis-cli ping（最可靠的方式）
+    if command -v redis-cli &> /dev/null && redis-cli ping 2>/dev/null | grep -qi "pong"; then
+        redis_running=true
+    # 方式2: 检查 systemctl 服务状态
+    elif systemctl is-active --quiet redis-server 2>/dev/null || systemctl is-active --quiet redis 2>/dev/null; then
+        redis_running=true
+    # 方式3: 检查进程（支持多种进程名）
+    elif pgrep -x redis-server > /dev/null 2>&1 || pgrep -x redis > /dev/null 2>&1; then
+        redis_running=true
+    # 方式4: 检查端口是否被监听
+    elif netstat -tuln 2>/dev/null | grep -q ":6379 " || ss -tuln 2>/dev/null | grep -q ":6379 "; then
+        redis_running=true
+    fi
+
+    if [ "$redis_running" = true ]; then
+        log_info "Redis: 运行中 ✓"
+    else
+        log_warn "Redis: 未运行"
+        if confirm "是否启动 Redis?"; then
+            sudo systemctl start redis-server 2>/dev/null || redis-server --daemonize yes
+        fi
+    fi
+}
+
+#===============================================================================
+# 开发环境
+#===============================================================================
+
+install_deps() {
+    local dir=$1
+    local name=$2
+    cd "$dir"
+
+    local need_install=false
+
+    # 检查 node_modules 是否存在
+    if [ ! -d "node_modules" ]; then
+        log_info "${name}: node_modules 不存在，需要安装"
+        need_install=true
+    # 检查 package.json 是否比 node_modules 更新（依赖有变更）
+    elif [ "package.json" -nt "node_modules" ]; then
+        log_info "${name}: package.json 已更新，重新安装依赖"
+        need_install=true
+    # 检查 package-lock.json 是否比 node_modules 更新
+    elif [ -f "package-lock.json" ] && [ "package-lock.json" -nt "node_modules" ]; then
+        log_info "${name}: package-lock.json 已更新，重新安装依赖"
+        need_install=true
+    fi
+
+    if [ "$need_install" = true ]; then
+        log_info "安装${name}依赖..."
+        npm install
+        # 更新 node_modules 时间戳
+        touch node_modules
+    else
+        log_info "${name}依赖已是最新 ✓"
+    fi
+}
+
+start_dev_all() {
+    log_step "启动全部开发服务..."
+
+    # 检查 Node.js 版本
+    check_node_version
+
+    check_services
+    mkdir -p "${LOG_DIR}"
+
+    # 安装依赖
+    install_deps "${SERVER_DIR}" "后端"
+    install_deps "${ADMIN_DIR}" "管理后台"
+    install_deps "${WEB_DIR}" "PC端网站"
+    install_deps "${MINIAPP_DIR}" "小程序"
+
+    # 启动服务
+    start_dev_server
+    start_dev_admin
+    start_dev_web
+    start_dev_miniapp
+
+    echo ""
+    log_info "全部开发服务已启动 ✓"
+    print_dev_urls
+}
+
+start_dev_server() {
+    mkdir -p "${LOG_DIR}"
+    install_deps "${SERVER_DIR}" "后端"
+
+    # 检查是否已运行
+    if [ -f "${LOG_DIR}/server-dev.pid" ]; then
+        local pid=$(cat "${LOG_DIR}/server-dev.pid")
+        if kill -0 "$pid" 2>/dev/null; then
+            log_warn "后端服务已在运行 (PID: $pid)"
+            return 0
+        fi
+    fi
+
+    log_info "启动后端服务..."
+    cd "${SERVER_DIR}"
+    npm run dev > "${LOG_DIR}/server-dev.log" 2>&1 &
+    echo $! > "${LOG_DIR}/server-dev.pid"
+    sleep 2
+    log_info "后端服务已启动: http://localhost:${API_PORT}"
+}
+
+start_dev_admin() {
+    mkdir -p "${LOG_DIR}"
+    install_deps "${ADMIN_DIR}" "管理后台"
+
+    # 检查是否已运行
+    if [ -f "${LOG_DIR}/admin-dev.pid" ]; then
+        local pid=$(cat "${LOG_DIR}/admin-dev.pid")
+        if kill -0 "$pid" 2>/dev/null; then
+            log_warn "管理后台已在运行 (PID: $pid)"
+            return 0
+        fi
+    fi
+
+    log_info "启动管理后台..."
+    cd "${ADMIN_DIR}"
+    npm run dev > "${LOG_DIR}/admin-dev.log" 2>&1 &
+    echo $! > "${LOG_DIR}/admin-dev.pid"
+    sleep 2
+    log_info "管理后台已启动: http://localhost:3001"
+}
+
+start_dev_miniapp() {
+    mkdir -p "${LOG_DIR}"
+    install_deps "${MINIAPP_DIR}" "小程序"
+
+    # 检查是否已运行
+    if [ -f "${LOG_DIR}/miniapp-dev.pid" ]; then
+        local pid=$(cat "${LOG_DIR}/miniapp-dev.pid")
+        if kill -0 "$pid" 2>/dev/null; then
+            log_warn "小程序编译已在运行 (PID: $pid)"
+            return 0
+        fi
+    fi
+
+    log_info "启动小程序编译 (微信)..."
+    cd "${MINIAPP_DIR}"
+    npm run dev:weapp > "${LOG_DIR}/miniapp-dev.log" 2>&1 &
+    echo $! > "${LOG_DIR}/miniapp-dev.pid"
+    sleep 2
+    log_info "小程序编译已启动，请用微信开发者工具打开 dist 目录"
+}
+
+start_dev_web() {
+    mkdir -p "${LOG_DIR}"
+    install_deps "${WEB_DIR}" "PC端网站"
+
+    # 检查是否已运行
+    if [ -f "${LOG_DIR}/web-dev.pid" ]; then
+        local pid=$(cat "${LOG_DIR}/web-dev.pid")
+        if kill -0 "$pid" 2>/dev/null; then
+            log_warn "PC端网站已在运行 (PID: $pid)"
+            return 0
+        fi
+    fi
+
+    log_info "启动 PC 端网站..."
+    cd "${WEB_DIR}"
+    npm run dev > "${LOG_DIR}/web-dev.log" 2>&1 &
+    echo $! > "${LOG_DIR}/web-dev.pid"
+    sleep 3
+    log_info "PC 端网站已启动: http://localhost:5000"
+}
+
+print_dev_urls() {
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}  服务地址:${NC}"
+    echo -e "    后端 API:     http://localhost:${API_PORT}"
+    echo -e "    管理后台:     http://localhost:3001"
+    echo -e "    PC端网站:     http://localhost:5000"
+    echo -e "    小程序:       使用微信开发者工具打开 dist 目录"
+    echo ""
+    echo -e "${YELLOW}  日志文件:${NC}"
+    echo -e "    后端:         ${LOG_DIR}/server-dev.log"
+    echo -e "    管理后台:     ${LOG_DIR}/admin-dev.log"
+    echo -e "    PC端网站:     ${LOG_DIR}/web-dev.log"
+    echo -e "    小程序:       ${LOG_DIR}/miniapp-dev.log"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+}
+
+stop_dev() {
+    log_step "停止开发环境..."
+
+    # 停止所有 pid 文件记录的进程
+    for pid_file in "${LOG_DIR}"/*.pid; do
+        if [ -f "$pid_file" ]; then
+            pid=$(cat "$pid_file")
+            name=$(basename "$pid_file" .pid)
+            if kill -0 "$pid" 2>/dev/null; then
+                kill "$pid" 2>/dev/null || true
+                log_info "已停止 ${name} (PID: $pid)"
+            fi
+            rm -f "$pid_file"
+        fi
+    done
+
+    # 清理可能残留的进程
+    pkill -f "ts-node-dev" 2>/dev/null || true
+    pkill -f "vite" 2>/dev/null || true
+    pkill -f "taro" 2>/dev/null || true
+
+    log_info "开发环境已停止 ✓"
+}
+
+#===============================================================================
+# 生产环境部署
+#===============================================================================
+
+build_project() {
+    log_step "构建项目..."
+
+    # 构建后端
+    log_info "构建后端..."
+    cd "${SERVER_DIR}"
+    npm install --production=false
+    npm run build
+
+    # 构建管理后台
+    log_info "构建管理后台..."
+    cd "${ADMIN_DIR}"
+    npm install
+    npm run build
+
+    # 构建 PC 端网站
+    log_info "构建 PC 端网站..."
+    cd "${WEB_DIR}"
+    npm install
+    npm run build
+
+    # 构建小程序
+    log_info "构建小程序..."
+    cd "${MINIAPP_DIR}"
+    npm install
+    npm run build:weapp
+
+    log_info "项目构建完成 ✓"
+}
+
+deploy_production() {
+    log_step "部署生产环境 (零停机)..."
+
+    check_dependencies || return 1
+    check_services
+
+    # 构建项目
+    build_project
+
+    # 部署后端 (PM2 零停机重载)
+    log_info "部署后端服务..."
+    cd "${SERVER_DIR}"
+
+    if pm2 describe "${PM2_APP_NAME}" > /dev/null 2>&1; then
+        log_info "执行零停机重载..."
+        pm2 reload "${PM2_APP_NAME}" --update-env
+    else
+        log_info "首次启动服务..."
+        pm2 start ecosystem.config.js
+    fi
+
+    # 保存 PM2 配置
+    pm2 save
+
+    # 部署管理后台静态文件
+    log_info "部署管理后台..."
+    sudo mkdir -p /var/www/${PROJECT_NAME}/admin
+    sudo cp -r "${ADMIN_DIR}/dist/"* /var/www/${PROJECT_NAME}/admin/
+
+    # 重载 Nginx
+    log_info "重载 Nginx..."
+    sudo nginx -t && sudo nginx -s reload
+
+    # 健康检查
+    sleep 3
+    health_check
+
+    echo ""
+    log_info "生产环境部署完成 ✓"
+    echo ""
+    echo -e "  ${GREEN}API 服务:${NC}     https://api.yourdomain.com"
+    echo -e "  ${GREEN}管理后台:${NC}     https://admin.yourdomain.com"
+    echo -e "  ${YELLOW}小程序:${NC}       请使用微信开发者工具上传 dist 目录"
+    echo ""
+}
+
+restart_production() {
+    log_step "重启生产服务..."
+
+    if pm2 describe "${PM2_APP_NAME}" > /dev/null 2>&1; then
+        pm2 reload "${PM2_APP_NAME}"
+        log_info "服务重启完成 ✓"
+    else
+        log_error "服务未运行，请先部署"
+    fi
+}
+
+stop_production() {
+    log_step "停止生产服务..."
+
+    if confirm "确定要停止生产服务吗?"; then
+        pm2 stop "${PM2_APP_NAME}" 2>/dev/null || true
+        log_info "服务已停止 ✓"
+    fi
+}
+
+#===============================================================================
+# 服务管理
+#===============================================================================
+
+show_status() {
+    echo ""
+    log_step "服务状态"
+    echo ""
+
+    # PM2 状态
+    echo -e "${CYAN}=== PM2 进程 ===${NC}"
+    pm2 list
+
+    echo ""
+    echo -e "${CYAN}=== 系统服务 ===${NC}"
+
+    # MongoDB
+    if systemctl is-active --quiet mongod 2>/dev/null || pgrep -x mongod > /dev/null; then
+        echo -e "  MongoDB:      ${GREEN}运行中${NC}"
+    else
+        echo -e "  MongoDB:      ${RED}已停止${NC}"
+    fi
+
+    # Redis
+    if systemctl is-active --quiet redis-server 2>/dev/null || pgrep -x redis-server > /dev/null; then
+        echo -e "  Redis:        ${GREEN}运行中${NC}"
+    else
+        echo -e "  Redis:        ${RED}已停止${NC}"
+    fi
+
+    # Nginx
+    if systemctl is-active --quiet nginx 2>/dev/null; then
+        echo -e "  Nginx:        ${GREEN}运行中${NC}"
+    else
+        echo -e "  Nginx:        ${RED}已停止${NC}"
+    fi
+
+    echo ""
+    echo -e "${CYAN}=== 端口监听 ===${NC}"
+    netstat -tlnp 2>/dev/null | grep -E "(${API_PORT}|${ADMIN_PORT}|27017|6379|80|443)" || ss -tlnp | grep -E "(${API_PORT}|${ADMIN_PORT}|27017|6379|80|443)" || true
+    echo ""
+}
+
+show_logs() {
+    echo ""
+    echo -e "${CYAN}选择要查看的日志:${NC}"
+    echo "  1) API 服务日志"
+    echo "  2) Nginx 访问日志"
+    echo "  3) Nginx 错误日志"
+    echo "  4) MongoDB 日志"
+    echo "  5) 全部日志 (PM2)"
+    echo ""
+    read -p "请选择 [1-5]: " log_choice
+
+    case $log_choice in
+        1) pm2 logs "${PM2_APP_NAME}" --lines 100 ;;
+        2) sudo tail -f /var/log/nginx/access.log ;;
+        3) sudo tail -f /var/log/nginx/error.log ;;
+        4) sudo tail -f /var/log/mongodb/mongod.log 2>/dev/null || tail -f /var/log/mongodb.log ;;
+        5) pm2 logs --lines 100 ;;
+        *) log_error "无效选择" ;;
+    esac
+}
+
+health_check() {
+    log_step "健康检查..."
+    echo ""
+
+    local api_url="http://localhost:${API_PORT}/api/v1/health"
+
+    # API 健康检查
+    echo -n "  API 服务: "
+    if curl -sf "${api_url}" > /dev/null 2>&1; then
+        response=$(curl -sf "${api_url}")
+        echo -e "${GREEN}健康${NC} ✓"
+        echo "    响应: $response"
+    else
+        echo -e "${RED}不健康${NC} ✗"
+    fi
+
+    # MongoDB 检查
+    echo -n "  MongoDB: "
+    if mongosh --eval "db.adminCommand('ping')" --quiet > /dev/null 2>&1 || mongo --eval "db.adminCommand('ping')" --quiet > /dev/null 2>&1; then
+        echo -e "${GREEN}健康${NC} ✓"
+    else
+        echo -e "${RED}不健康${NC} ✗"
+    fi
+
+    # Redis 检查
+    echo -n "  Redis: "
+    if redis-cli ping > /dev/null 2>&1; then
+        echo -e "${GREEN}健康${NC} ✓"
+    else
+        echo -e "${RED}不健康${NC} ✗"
+    fi
+
+    echo ""
+}
+
+#===============================================================================
+# 数据库管理
+#===============================================================================
+
+backup_database() {
+    log_step "备份数据库..."
+
+    mkdir -p "${BACKUP_DIR}"
+
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local backup_name="backup_${timestamp}"
+    local backup_path="${BACKUP_DIR}/${backup_name}"
+
+    # MongoDB 备份
+    log_info "备份 MongoDB..."
+    mongodump --db ${PROJECT_NAME} --out "${backup_path}/mongodb" 2>/dev/null || {
+        log_error "MongoDB 备份失败"
+        return 1
+    }
+
+    # Redis 备份
+    log_info "备份 Redis..."
+    redis-cli BGSAVE > /dev/null 2>&1
+    sleep 2
+    cp /var/lib/redis/dump.rdb "${backup_path}/redis_dump.rdb" 2>/dev/null || \
+    cp /var/lib/redis/6379/dump.rdb "${backup_path}/redis_dump.rdb" 2>/dev/null || \
+    log_warn "Redis 备份跳过 (找不到 dump.rdb)"
+
+    # 压缩备份
+    log_info "压缩备份文件..."
+    cd "${BACKUP_DIR}"
+    tar -czf "${backup_name}.tar.gz" "${backup_name}"
+    rm -rf "${backup_name}"
+
+    # 清理旧备份 (保留最近7天)
+    find "${BACKUP_DIR}" -name "backup_*.tar.gz" -mtime +7 -delete 2>/dev/null || true
+
+    log_info "备份完成: ${BACKUP_DIR}/${backup_name}.tar.gz"
+
+    # 显示备份列表
+    echo ""
+    echo -e "${CYAN}现有备份:${NC}"
+    ls -lh "${BACKUP_DIR}"/*.tar.gz 2>/dev/null || echo "  无备份文件"
+    echo ""
+}
+
+restore_database() {
+    log_step "恢复数据库..."
+
+    # 列出可用备份
+    echo ""
+    echo -e "${CYAN}可用备份:${NC}"
+    local backups=($(ls -1 "${BACKUP_DIR}"/*.tar.gz 2>/dev/null))
+
+    if [ ${#backups[@]} -eq 0 ]; then
+        log_error "没有可用的备份文件"
+        return 1
+    fi
+
+    local i=1
+    for backup in "${backups[@]}"; do
+        echo "  $i) $(basename $backup)"
+        ((i++))
+    done
+
+    echo ""
+    read -p "请选择要恢复的备份 [1-${#backups[@]}]: " choice
+
+    if [ "$choice" -lt 1 ] || [ "$choice" -gt ${#backups[@]} ]; then
+        log_error "无效选择"
+        return 1
+    fi
+
+    local selected_backup="${backups[$((choice-1))]}"
+
+    if ! confirm "确定要恢复备份 $(basename $selected_backup)? 这将覆盖现有数据!"; then
+        return 1
+    fi
+
+    # 解压备份
+    local temp_dir=$(mktemp -d)
+    tar -xzf "$selected_backup" -C "$temp_dir"
+    local backup_dir=$(ls "$temp_dir")
+
+    # 恢复 MongoDB
+    log_info "恢复 MongoDB..."
+    mongorestore --db ${PROJECT_NAME} --drop "${temp_dir}/${backup_dir}/mongodb/${PROJECT_NAME}" 2>/dev/null || {
+        log_error "MongoDB 恢复失败"
+        rm -rf "$temp_dir"
+        return 1
+    }
+
+    # 恢复 Redis (如果存在)
+    if [ -f "${temp_dir}/${backup_dir}/redis_dump.rdb" ]; then
+        log_info "恢复 Redis..."
+        sudo systemctl stop redis-server 2>/dev/null || true
+        sudo cp "${temp_dir}/${backup_dir}/redis_dump.rdb" /var/lib/redis/dump.rdb 2>/dev/null || true
+        sudo systemctl start redis-server 2>/dev/null || redis-server --daemonize yes
+    fi
+
+    rm -rf "$temp_dir"
+
+    log_info "数据库恢复完成 ✓"
+}
+
+#===============================================================================
+# 系统管理
+#===============================================================================
+
+init_environment() {
+    log_step "初始化环境..."
+
+    echo ""
+    echo -e "${CYAN}选择初始化类型:${NC}"
+    echo "  1) 开发环境初始化"
+    echo "  2) 生产环境初始化"
+    echo ""
+    read -p "请选择 [1-2]: " init_type
+
+    case $init_type in
+        1) init_dev_env ;;
+        2) init_prod_env ;;
+        *) log_error "无效选择" ;;
+    esac
+}
+
+init_dev_env() {
+    log_step "初始化开发环境..."
+
+    # 创建目录
+    mkdir -p "${LOG_DIR}" "${BACKUP_DIR}"
+
+    # 复制环境配置
+    if [ ! -f "${SERVER_DIR}/.env" ]; then
+        if [ -f "${SERVER_DIR}/.env.example" ]; then
+            cp "${SERVER_DIR}/.env.example" "${SERVER_DIR}/.env"
+            log_info "已创建 .env 文件，请编辑配置"
+        fi
+    fi
+
+    # 安装依赖
+    log_info "安装依赖..."
+    cd "${SERVER_DIR}" && npm install
+    cd "${ADMIN_DIR}" && npm install
+    cd "${MINIAPP_DIR}" && npm install
+
+    log_info "开发环境初始化完成 ✓"
+}
+
+init_prod_env() {
+    log_step "初始化生产环境..."
+
+    # 创建目录
+    mkdir -p "${LOG_DIR}" "${BACKUP_DIR}"
+    sudo mkdir -p /var/www/${PROJECT_NAME}/{admin,static}
+
+    # 创建 PM2 配置
+    create_pm2_config
+
+    # 创建 Nginx 配置
+    create_nginx_config
+
+    # 创建日志轮转配置
+    create_logrotate_config
+
+    # 设置 PM2 开机启动
+    pm2 startup 2>/dev/null || true
+
+    log_info "生产环境初始化完成 ✓"
+    log_warn "请编辑以下配置文件:"
+    echo "  - ${SERVER_DIR}/.env"
+    echo "  - /etc/nginx/sites-available/${PROJECT_NAME}"
+}
+
+# 项目初始化向导（包含创建管理员）
+init_project() {
+    log_step "项目初始化向导"
+    echo ""
+
+    # 1. 检查环境
+    log_info "检查环境依赖..."
+    check_command "node" || { log_error "请先安装 Node.js"; return 1; }
+    check_command "npm" || { log_error "请先安装 npm"; return 1; }
+
+    local node_version=$(node -v | sed 's/v//' | cut -d. -f1)
+    if [ "$node_version" -lt 16 ]; then
+        log_error "Node.js 版本过低，需要 16+"
+        return 1
+    fi
+    log_info "Node.js 版本: $(node -v) ✓"
+
+    # 2. 创建环境配置
+    log_step "配置环境变量..."
+    if [ ! -f "${SERVER_DIR}/.env" ]; then
+        if [ -f "${SERVER_DIR}/.env.example" ]; then
+            cp "${SERVER_DIR}/.env.example" "${SERVER_DIR}/.env"
+            log_info "已从 .env.example 创建 server/.env"
+        else
+            log_info "创建默认 .env 配置..."
+            cat > "${SERVER_DIR}/.env" << 'ENVEOF'
+# 服务器配置
+NODE_ENV=development
+PORT=3000
+
+# 数据库配置
+MONGODB_URI=mongodb://localhost:27017/zhuangxiu
+
+# Redis配置
+REDIS_URL=redis://localhost:6379
+
+# JWT配置
+JWT_SECRET=your-secret-key-change-in-production
+JWT_EXPIRES_IN=7d
+
+# 微信小程序配置（需要填写）
+WECHAT_APPID=
+WECHAT_SECRET=
+
+# 短信服务配置（需要填写）
+SMS_ACCESS_KEY_ID=
+SMS_ACCESS_KEY_SECRET=
+SMS_SIGN_NAME=
+SMS_TEMPLATE_CODE=
+
+# 文件上传配置
+UPLOAD_DIR=uploads
+MAX_FILE_SIZE=10485760
+ENVEOF
+            log_info "已创建 server/.env 配置文件"
+        fi
+    else
+        log_info "server/.env 已存在，跳过"
+    fi
+
+    # 3. 安装依赖
+    if confirm "是否安装所有项目依赖?"; then
+        log_step "安装项目依赖..."
+
+        if [ -d "${SERVER_DIR}" ]; then
+            log_info "安装 server 依赖..."
+            cd "${SERVER_DIR}" && npm install
+        fi
+
+        if [ -d "${WEB_DIR}" ]; then
+            log_info "安装 web 依赖..."
+            cd "${WEB_DIR}" && npm install
+        fi
+
+        if [ -d "${ADMIN_DIR}" ]; then
+            log_info "安装 admin 依赖..."
+            cd "${ADMIN_DIR}" && npm install
+        fi
+
+        if [ -d "${MINIAPP_DIR}" ] && [ -f "${MINIAPP_DIR}/package.json" ]; then
+            log_info "安装 miniapp 依赖..."
+            cd "${MINIAPP_DIR}" && npm install
+        fi
+
+        log_info "依赖安装完成 ✓"
+    fi
+
+    # 4. 创建管理员
+    if confirm "是否创建默认管理员账号?"; then
+        create_admin_user
+    fi
+
+    # 5. 完成
+    echo ""
+    echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
+    log_info "项目初始化完成！"
+    echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo "启动开发服务器:"
+    echo "  ./deploy.sh dev        - 启动后端API服务器"
+    echo "  ./deploy.sh dev:admin  - 启动管理后台"
+    echo "  ./deploy.sh dev:web    - 启动PC用户端"
+    echo "  ./deploy.sh dev:mini   - 启动小程序开发"
+    echo ""
+    echo "端口分配:"
+    echo "  API服务器:    http://localhost:3000"
+    echo "  管理后台:     http://localhost:3001"
+    echo "  PC用户端:     http://localhost:5000"
+    echo ""
+}
+
+# 创建管理员账号
+create_admin_user() {
+    log_step "创建管理员账号..."
+
+    read -p "管理员手机号 (默认: 13800000000): " admin_phone
+    admin_phone=${admin_phone:-13800000000}
+
+    read -p "管理员密码 (默认: admin123): " admin_password
+    admin_password=${admin_password:-admin123}
+
+    read -p "管理员昵称 (默认: 系统管理员): " admin_nickname
+    admin_nickname=${admin_nickname:-系统管理员}
+
+    # 创建初始化脚本
+    mkdir -p "${SERVER_DIR}/scripts"
+    cat > "${SERVER_DIR}/scripts/initAdmin.js" << ADMINEOF
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+
+const adminConfig = {
+  phone: '${admin_phone}',
+  password: '${admin_password}',
+  nickname: '${admin_nickname}'
+};
+
+const UserSchema = new mongoose.Schema({
+  nickname: { type: String, required: true, trim: true },
+  avatar: { type: String, default: '' },
+  phone: { type: String, unique: true, sparse: true },
+  openid: { type: String, unique: true, sparse: true },
+  password: { type: String, select: false },
+  gender: { type: String, enum: ['male', 'female', 'unknown'], default: 'unknown' },
+  region: { type: String, default: '' },
+  signature: { type: String, default: '' },
+  role: { type: String, enum: ['user', 'merchant', 'admin'], default: 'user' },
+  merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant' },
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
+
+UserSchema.pre('save', async function(next) {
+  if (!this.isModified('password') || !this.password) return next();
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+const User = mongoose.model('User', UserSchema);
+
+async function initAdmin() {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('数据库连接成功');
+
+    const existingAdmin = await User.findOne({ phone: adminConfig.phone });
+    if (existingAdmin) {
+      console.log('管理员账号已存在，更新权限...');
+      existingAdmin.role = 'admin';
+      await existingAdmin.save();
+    } else {
+      await User.create({
+        phone: adminConfig.phone,
+        password: adminConfig.password,
+        nickname: adminConfig.nickname,
+        role: 'admin',
+        isActive: true,
+      });
+      console.log('管理员账号创建成功');
+    }
+
+    console.log('管理员信息:');
+    console.log('  手机号:', adminConfig.phone);
+    console.log('  密码:', adminConfig.password);
+
+    await mongoose.disconnect();
+    process.exit(0);
+  } catch (error) {
+    console.error('初始化失败:', error.message);
+    process.exit(1);
+  }
+}
+
+initAdmin();
+ADMINEOF
+
+    log_info "已创建管理员初始化脚本"
+
+    if confirm "是否现在执行初始化? (需要MongoDB服务运行)"; then
+        log_info "执行管理员初始化..."
+        cd "${SERVER_DIR}"
+        if node scripts/initAdmin.js; then
+            log_info "管理员初始化完成 ✓"
+        else
+            log_error "管理员初始化失败，请确保MongoDB服务已启动"
+            log_info "稍后可手动运行: cd server && node scripts/initAdmin.js"
+        fi
+    else
+        log_info "稍后可运行: cd server && node scripts/initAdmin.js"
+    fi
+}
+
+create_pm2_config() {
+    log_info "创建 PM2 配置..."
+
+    cat > "${SERVER_DIR}/ecosystem.config.js" << 'PMEOF'
+module.exports = {
+  apps: [{
+    name: 'zhuangxiu-api',
+    script: 'dist/index.js',
+    cwd: '/home/user/zhuangxiu/server',
+    instances: 'max',  // 使用所有 CPU 核心
+    exec_mode: 'cluster',
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '1G',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 3000
+    },
+    env_development: {
+      NODE_ENV: 'development',
+      PORT: 3000
+    },
+    // 零停机部署配置
+    wait_ready: true,
+    listen_timeout: 10000,
+    kill_timeout: 5000,
+    // 日志配置
+    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+    error_file: '/home/user/zhuangxiu/logs/pm2-error.log',
+    out_file: '/home/user/zhuangxiu/logs/pm2-out.log',
+    merge_logs: true,
+    // 健康检查
+    exp_backoff_restart_delay: 100,
+    max_restarts: 10,
+    min_uptime: '10s'
+  }]
+};
+PMEOF
+
+    log_info "PM2 配置已创建: ${SERVER_DIR}/ecosystem.config.js"
+}
+
+create_nginx_config() {
+    log_info "创建 Nginx 配置..."
+
+    sudo tee "/etc/nginx/sites-available/${PROJECT_NAME}" > /dev/null << 'NGINXEOF'
+# 上游服务器 (API)
+upstream zhuangxiu_api {
+    least_conn;
+    server 127.0.0.1:3000 weight=1 max_fails=3 fail_timeout=30s;
+    keepalive 32;
+}
+
+# HTTP 重定向到 HTTPS
+server {
+    listen 80;
+    server_name api.yourdomain.com admin.yourdomain.com;
+    return 301 https://$server_name$request_uri;
+}
+
+# API 服务
+server {
+    listen 443 ssl http2;
+    server_name api.yourdomain.com;
+
+    # SSL 配置
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+    ssl_prefer_server_ciphers off;
+
+    # 安全头
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Gzip 压缩
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+
+    # API 代理
+    location /api/ {
+        proxy_pass http://zhuangxiu_api;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 90s;
+        proxy_connect_timeout 90s;
+    }
+
+    # WebSocket 支持
+    location /socket.io/ {
+        proxy_pass http://zhuangxiu_api;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # 静态文件
+    location /uploads/ {
+        alias /home/user/zhuangxiu/server/uploads/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # 健康检查
+    location /health {
+        proxy_pass http://zhuangxiu_api/api/v1/health;
+        proxy_http_version 1.1;
+    }
+}
+
+# 管理后台
+server {
+    listen 443 ssl http2;
+    server_name admin.yourdomain.com;
+
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    root /var/www/zhuangxiu/admin;
+    index index.html;
+
+    # Gzip
+    gzip on;
+    gzip_static on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
+
+    # 静态资源缓存
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # SPA 路由
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+NGINXEOF
+
+    # 启用站点
+    sudo ln -sf "/etc/nginx/sites-available/${PROJECT_NAME}" "/etc/nginx/sites-enabled/${PROJECT_NAME}" 2>/dev/null || true
+
+    log_info "Nginx 配置已创建"
+    log_warn "请修改域名和 SSL 证书路径"
+}
+
+create_logrotate_config() {
+    log_info "创建日志轮转配置..."
+
+    sudo tee "/etc/logrotate.d/${PROJECT_NAME}" > /dev/null << LOGEOF
+${LOG_DIR}/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 $(whoami) $(whoami)
+    sharedscripts
+    postrotate
+        pm2 reloadLogs > /dev/null 2>&1 || true
+    endscript
+}
+LOGEOF
+
+    log_info "日志轮转配置已创建"
+}
+
+update_ssl() {
+    log_step "更新 SSL 证书..."
+
+    echo ""
+    echo -e "${CYAN}SSL 证书管理:${NC}"
+    echo "  1) 申请新证书 (Let's Encrypt)"
+    echo "  2) 续期证书"
+    echo "  3) 查看证书状态"
+    echo ""
+    read -p "请选择 [1-3]: " ssl_choice
+
+    case $ssl_choice in
+        1)
+            read -p "请输入域名 (多个用空格分隔): " domains
+            sudo certbot --nginx -d ${domains}
+            ;;
+        2)
+            sudo certbot renew
+            sudo nginx -s reload
+            ;;
+        3)
+            sudo certbot certificates
+            ;;
+        *)
+            log_error "无效选择"
+            ;;
+    esac
+}
+
+clean_logs() {
+    log_step "清理日志..."
+
+    echo ""
+    echo -e "${CYAN}选择清理范围:${NC}"
+    echo "  1) 清理 7 天前的日志"
+    echo "  2) 清理 30 天前的日志"
+    echo "  3) 清理所有日志"
+    echo ""
+    read -p "请选择 [1-3]: " clean_choice
+
+    case $clean_choice in
+        1)
+            find "${LOG_DIR}" -name "*.log" -mtime +7 -delete 2>/dev/null
+            pm2 flush
+            log_info "已清理 7 天前的日志"
+            ;;
+        2)
+            find "${LOG_DIR}" -name "*.log" -mtime +30 -delete 2>/dev/null
+            pm2 flush
+            log_info "已清理 30 天前的日志"
+            ;;
+        3)
+            if confirm "确定要清理所有日志?"; then
+                rm -f "${LOG_DIR}"/*.log
+                pm2 flush
+                log_info "已清理所有日志"
+            fi
+            ;;
+        *)
+            log_error "无效选择"
+            ;;
+    esac
+}
+
+#===============================================================================
+# Docker Compose 管理
+#===============================================================================
+
+docker_menu() {
+    echo ""
+    echo -e "${CYAN}Docker Compose 管理:${NC}"
+    echo "  1) 启动所有服务"
+    echo "  2) 停止所有服务"
+    echo "  3) 重建并启动"
+    echo "  4) 查看状态"
+    echo "  5) 查看日志"
+    echo "  6) 生成 docker-compose.yml"
+    echo ""
+    read -p "请选择 [1-6]: " docker_choice
+
+    case $docker_choice in
+        1)
+            docker-compose up -d
+            log_info "Docker 服务已启动"
+            ;;
+        2)
+            docker-compose down
+            log_info "Docker 服务已停止"
+            ;;
+        3)
+            docker-compose down
+            docker-compose build --no-cache
+            docker-compose up -d
+            log_info "Docker 服务已重建"
+            ;;
+        4)
+            docker-compose ps
+            ;;
+        5)
+            docker-compose logs -f --tail=100
+            ;;
+        6)
+            create_docker_compose
+            ;;
+        *)
+            log_error "无效选择"
+            ;;
+    esac
+}
+
+create_docker_compose() {
+    log_info "生成 docker-compose.yml..."
+
+    cat > "${PROJECT_DIR}/docker-compose.yml" << 'DOCKEREOF'
+version: '3.8'
+
+services:
+  # API 服务
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: zhuangxiu-api
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MONGODB_URI=mongodb://mongodb:27017/zhuangxiu
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - zhuangxiu-network
+    volumes:
+      - ./server/uploads:/app/uploads
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      restart_policy:
+        condition: on-failure
+
+  # 管理后台
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: zhuangxiu-admin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    networks:
+      - zhuangxiu-network
+    depends_on:
+      - api
+
+  # MongoDB
+  mongodb:
+    image: mongo:6.0
+    container_name: zhuangxiu-mongodb
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=your_password_here
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./backups/mongodb:/backup
+    networks:
+      - zhuangxiu-network
+    command: --wiredTigerCacheSizeGB 1
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: zhuangxiu-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - zhuangxiu-network
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  # Nginx 反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: zhuangxiu-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - api
+      - admin
+    networks:
+      - zhuangxiu-network
+
+  # Certbot (SSL 证书)
+  certbot:
+    image: certbot/certbot
+    container_name: zhuangxiu-certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+networks:
+  zhuangxiu-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  redis_data:
+DOCKEREOF
+
+    # 创建 Server Dockerfile
+    cat > "${SERVER_DIR}/Dockerfile" << 'SERVEREOF'
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production=false
+COPY . .
+RUN npm run build
+
+FROM node:18-alpine
+
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY package*.json ./
+
+ENV NODE_ENV=production
+EXPOSE 3000
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/api/v1/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"
+
+CMD ["node", "dist/index.js"]
+SERVEREOF
+
+    # 创建 Admin Dockerfile
+    cat > "${ADMIN_DIR}/Dockerfile" << 'ADMINEOF'
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+ADMINEOF
+
+    # 创建 Admin nginx.conf
+    cat > "${ADMIN_DIR}/nginx.conf" << 'ADMINNGINXEOF'
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+ADMINNGINXEOF
+
+    log_info "Docker 配置文件已生成"
+    echo ""
+    echo "生成的文件:"
+    echo "  - ${PROJECT_DIR}/docker-compose.yml"
+    echo "  - ${SERVER_DIR}/Dockerfile"
+    echo "  - ${ADMIN_DIR}/Dockerfile"
+    echo ""
+    log_warn "请修改 docker-compose.yml 中的密码和域名配置"
+}
+
+#===============================================================================
+# 主程序
+#===============================================================================
+
+main() {
+    print_banner
+
+    while true; do
+        print_menu
+        read -p "请输入选项 [0-19]: " choice
+
+        case $choice in
+            1) start_dev_all ;;
+            2) start_dev_server ;;
+            3) start_dev_admin ;;
+            4) start_dev_miniapp ;;
+            5) start_dev_web ;;
+            6) stop_dev ;;
+            7) deploy_production ;;
+            8) restart_production ;;
+            9) stop_production ;;
+            10) show_status ;;
+            11) show_logs ;;
+            12) health_check ;;
+            13) backup_database ;;
+            14) restore_database ;;
+            15) init_environment ;;
+            16) init_project ;;
+            17) update_ssl ;;
+            18) clean_logs ;;
+            19) docker_menu ;;
+            0)
+                echo ""
+                log_info "再见！"
+                exit 0
+                ;;
+            *)
+                log_error "无效选项，请重新选择"
+                ;;
+        esac
+
+        echo ""
+        read -p "按 Enter 键继续..."
+    done
+}
+
+# 支持命令行参数
+if [ $# -gt 0 ]; then
+    case $1 in
+        dev) start_dev_all ;;
+        dev:server) start_dev_server ;;
+        dev:admin) start_dev_admin ;;
+        dev:miniapp) start_dev_miniapp ;;
+        dev:web) start_dev_web ;;
+        dev:stop) stop_dev ;;
+        deploy) deploy_production ;;
+        restart) restart_production ;;
+        stop) stop_production ;;
+        status) show_status ;;
+        logs) show_logs ;;
+        health) health_check ;;
+        backup) backup_database ;;
+        restore) restore_database ;;
+        init) init_environment ;;
+        init:project) init_project ;;
+        ssl) update_ssl ;;
+        clean) clean_logs ;;
+        docker) docker_menu ;;
+        help|--help|-h)
+            echo "用法: $0 [命令]"
+            echo ""
+            echo "开发环境命令:"
+            echo "  dev          启动全部开发服务"
+            echo "  dev:server   仅启动后端 API"
+            echo "  dev:admin    仅启动管理后台"
+            echo "  dev:miniapp  启动小程序编译"
+            echo "  dev:web      启动 PC 端网站"
+            echo "  dev:stop     停止开发环境"
+            echo ""
+            echo "生产环境命令:"
+            echo "  deploy       部署生产环境 (零停机)"
+            echo "  restart      重启生产服务"
+            echo "  stop         停止生产服务"
+            echo ""
+            echo "管理命令:"
+            echo "  status       查看服务状态"
+            echo "  logs         查看日志"
+            echo "  health       健康检查"
+            echo "  backup       备份数据库"
+            echo "  restore      恢复数据库"
+            echo "  init         初始化环境"
+            echo "  init:project 项目初始化向导（安装依赖、配置环境、创建管理员）"
+            echo "  ssl          SSL 证书管理"
+            echo "  clean        清理日志"
+            echo "  docker       Docker 管理"
+            echo ""
+            echo "不带参数运行将进入交互式菜单"
+            ;;
+        *)
+            log_error "未知命令: $1"
+            echo "使用 '$0 help' 查看帮助"
+            exit 1
+            ;;
+    esac
+else
+    main
+fi

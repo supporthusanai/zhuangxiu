@@ -1,8 +1,11 @@
 import { View, Text, Input, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useState } from 'react'
-import { mockLogin, wechatLoginComplete } from '@/utils/user'
+import { phoneLogin, sendSmsCode, getCurrentUser } from '@/services/api'
+import { saveUserInfo, wechatLoginComplete } from '@/utils/user'
 import './index.scss'
+
+const isDev = process.env.NODE_ENV === 'development'
 
 export default function Login() {
   const [phone, setPhone] = useState('')
@@ -11,7 +14,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
 
   // 发送验证码
-  const handleSendCode = () => {
+  const handleSendCode = async () => {
     if (!phone) {
       Taro.showToast({
         title: '请输入手机号',
@@ -30,23 +33,33 @@ export default function Login() {
       return
     }
 
-    // 模拟发送验证码
-    Taro.showToast({
-      title: '验证码已发送',
-      icon: 'success',
-      duration: 2000
-    })
+    try {
+      const res = await sendSmsCode(phone)
+      if (res.success) {
+        Taro.showToast({
+          title: '验证码已发送',
+          icon: 'success',
+          duration: 2000
+        })
 
-    // 开始倒计时
-    let count = 60
-    setCountdown(count)
-    const timer = setInterval(() => {
-      count--
-      setCountdown(count)
-      if (count <= 0) {
-        clearInterval(timer)
+        // 开始倒计时
+        let count = 60
+        setCountdown(count)
+        const timer = setInterval(() => {
+          count--
+          setCountdown(count)
+          if (count <= 0) {
+            clearInterval(timer)
+          }
+        }, 1000)
       }
-    }, 1000)
+    } catch (error: any) {
+      Taro.showToast({
+        title: error.message || '发送失败',
+        icon: 'none',
+        duration: 2000
+      })
+    }
   }
 
   // 登录
@@ -71,24 +84,40 @@ export default function Login() {
 
     setLoading(true)
     try {
-      await mockLogin(phone, code)
-      Taro.showToast({
-        title: '登录成功',
-        icon: 'success',
-        duration: 2000
-      })
+      const res = await phoneLogin({ phone, code })
+      if (res.success && res.data) {
+        // 保存token
+        Taro.setStorageSync('token', res.data.token)
 
-      // 延迟跳转，让用户看到成功提示
-      setTimeout(() => {
-        // 返回上一页或跳转到首页
-        if (Taro.getCurrentPages().length > 1) {
-          Taro.navigateBack()
-        } else {
-          Taro.switchTab({
-            url: '/pages/index/index'
+        // 获取并保存用户信息
+        const userRes = await getCurrentUser()
+        if (userRes.success && userRes.data) {
+          saveUserInfo({
+            id: userRes.data._id,
+            nickname: userRes.data.nickname,
+            avatar: userRes.data.avatar,
+            phone: userRes.data.phone,
+            isLogin: true
           })
         }
-      }, 1500)
+
+        Taro.showToast({
+          title: '登录成功',
+          icon: 'success',
+          duration: 2000
+        })
+
+        // 延迟跳转
+        setTimeout(() => {
+          if (Taro.getCurrentPages().length > 1) {
+            Taro.navigateBack()
+          } else {
+            Taro.switchTab({
+              url: '/pages/index/index'
+            })
+          }
+        }, 1500)
+      }
     } catch (error: any) {
       Taro.showToast({
         title: error.message || '登录失败',
@@ -184,10 +213,12 @@ export default function Login() {
             </View>
           </View>
 
-          {/* 提示信息 */}
-          <View className='login-tip'>
-            <Text className='tip-text'>测试验证码：123456</Text>
-          </View>
+          {/* 开发环境提示 */}
+          {isDev && (
+            <View className='login-tip'>
+              <Text className='tip-text'>开发模式 - 测试验证码：123456</Text>
+            </View>
+          )}
 
           {/* 登录按钮 */}
           <Button

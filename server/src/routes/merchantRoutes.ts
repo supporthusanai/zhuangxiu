@@ -4,6 +4,7 @@ import {
   getMyMerchant,
   updateMerchant,
   getMerchants,
+  getMerchantById,
   reviewMerchant,
   addDesigner,
   getMyDesigners,
@@ -28,5 +29,8 @@ router.delete('/designers/:id', authenticate, checkRole('merchant'), deleteDesig
 // 管理员接口
 router.get('/list', authenticate, checkRole('admin'), getMerchants); // 获取商家列表
 router.put('/:id/review', authenticate, checkRole('admin'), reviewMerchant); // 审核商家
+
+// 公开接口 - 放在最后避免与其他路由冲突
+router.get('/:id', getMerchantById); // 获取商家详情
 
 export default router;

@@ -170,6 +170,11 @@ export const uploadImage = (filePath: string) => {
 
 // ============ 商家相关 ============
 
+// 获取商家详情（公开）
+export const getMerchantDetail = (id: string) => {
+  return get(`/merchants/${id}`);
+};
+
 // 申请成为商家
 export const applyMerchant = (data: {
   companyName: string;
@@ -220,6 +225,205 @@ export const deleteDesigner = (id: number | string) => {
   return del(`/merchants/designers/${id}`, undefined, true);
 };
 
+// ============ 订单相关 ============
+
+// 创建订单
+export const createOrder = (data: {
+  merchant: string;
+  designer?: string;
+  case?: string;
+  projectName: string;
+  projectAddress: string;
+  projectArea: number;
+  projectStyle: string;
+  projectRooms: string;
+  items: Array<{
+    name: string;
+    description?: string;
+    quantity: number;
+    unit: string;
+    unitPrice: number;
+    totalPrice: number;
+  }>;
+  discount?: number;
+  expectedStartDate?: string;
+  customerNote?: string;
+  contactName: string;
+  contactPhone: string;
+}) => {
+  return post('/orders', data, true);
+};
+
+// 获取我的订单
+export const getMyOrders = (params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+}) => {
+  return get('/orders/my', params, true);
+};
+
+// 获取订单详情
+export const getOrderDetail = (id: string) => {
+  return get(`/orders/${id}`, undefined, true);
+};
+
+// 取消订单
+export const cancelOrder = (id: string, reason?: string) => {
+  return post(`/orders/${id}/cancel`, { reason }, true);
+};
+
+// 商家：获取订单列表
+export const getMerchantOrders = (params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  paymentStatus?: string;
+}) => {
+  return get('/orders/merchant/list', params, true);
+};
+
+// 商家：更新订单状态
+export const updateOrderStatus = (id: string, data: {
+  status: string;
+  merchantNote?: string;
+}) => {
+  return put(`/orders/${id}/status`, data, true);
+};
+
+// 商家：添加支付记录
+export const addPaymentRecord = (id: string, data: {
+  amount: number;
+  method: 'wechat' | 'alipay' | 'bank' | 'cash';
+  transactionId?: string;
+  note?: string;
+}) => {
+  return post(`/orders/${id}/payment`, data, true);
+};
+
+// 商家：获取订单统计
+export const getOrderStats = () => {
+  return get('/orders/merchant/stats', undefined, true);
+};
+
+// 发送短信验证码
+export const sendSmsCode = (phone: string) => {
+  return post('/auth/send-code', { phone });
+};
+
+// ============ 评价相关 ============
+
+// 创建评价
+export const createReview = (data: {
+  targetType: 'case' | 'merchant' | 'order';
+  targetId: string;
+  orderId?: string;
+  rating: number;
+  content: string;
+  images?: string[];
+  tags?: string[];
+  isAnonymous?: boolean;
+}) => {
+  return post('/reviews', data, true);
+};
+
+// 获取目标的评价列表
+export const getReviews = (
+  targetType: string,
+  targetId: string,
+  params?: {
+    page?: number;
+    limit?: number;
+    sort?: 'newest' | 'oldest' | 'highest' | 'lowest' | 'popular';
+  }
+) => {
+  return get(`/reviews/${targetType}/${targetId}`, params);
+};
+
+// 获取我的评价
+export const getMyReviews = (params?: {
+  page?: number;
+  limit?: number;
+}) => {
+  return get('/reviews/my/list', params, true);
+};
+
+// 点赞评价
+export const likeReview = (id: string) => {
+  return post(`/reviews/${id}/like`, undefined, true);
+};
+
+// 删除评价
+export const deleteReview = (id: string) => {
+  return del(`/reviews/${id}`, undefined, true);
+};
+
+// 商家回复评价
+export const replyReview = (id: string, content: string) => {
+  return post(`/reviews/${id}/reply`, { content }, true);
+};
+
+// ============ 预约相关 ============
+
+// 创建预约
+export const createAppointment = (data: {
+  merchantId: string;
+  designerId?: string;
+  type: 'consultation' | 'site_visit' | 'design_review' | 'construction_check';
+  date: string;
+  timeSlot: string;
+  contactName: string;
+  contactPhone: string;
+  address?: string;
+  projectArea?: number;
+  projectStyle?: string;
+  note?: string;
+}) => {
+  return post('/appointments', data, true);
+};
+
+// 获取我的预约
+export const getMyAppointments = (params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+}) => {
+  return get('/appointments/my', params, true);
+};
+
+// 获取预约详情
+export const getAppointmentDetail = (id: string) => {
+  return get(`/appointments/${id}`, undefined, true);
+};
+
+// 取消预约
+export const cancelAppointment = (id: string, reason?: string) => {
+  return post(`/appointments/${id}/cancel`, { reason }, true);
+};
+
+// 获取可用时间槽
+export const getAvailableSlots = (merchantId: string, date: string) => {
+  return get('/appointments/slots', { merchantId, date });
+};
+
+// 商家：获取预约列表
+export const getMerchantAppointments = (params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  date?: string;
+}) => {
+  return get('/appointments/merchant/list', params, true);
+};
+
+// 商家：更新预约状态
+export const updateAppointmentStatus = (id: string, data: {
+  status: 'confirmed' | 'cancelled' | 'completed' | 'no_show';
+  merchantNote?: string;
+}) => {
+  return put(`/appointments/${id}/status`, data, true);
+};
+
 // ============ 聊天相关 ============
 
 // 获取对话列表
@@ -242,8 +446,9 @@ export const getMessages = (conversationId: string, params?: {
 
 // 创建对话
 export const createConversation = (data: {
-  participantId: string;
-  participantType: 'user' | 'merchant' | 'designer';
+  receiverId: string;
+  caseId?: string;
+  designerId?: string;
 }) => {
   return post('/chat/conversations', data, true);
 };
@@ -251,6 +456,20 @@ export const createConversation = (data: {
 // 删除对话
 export const deleteConversation = (id: string) => {
   return del(`/chat/conversations/${id}`, undefined, true);
+};
+
+// 发送消息
+export const sendMessage = (conversationId: string, data: {
+  content: string;
+  type?: 'text' | 'image' | 'file';
+  mediaUrl?: string;
+}) => {
+  return post(`/chat/conversations/${conversationId}/messages`, data, true);
+};
+
+// 标记消息已读
+export const markMessagesRead = (conversationId: string) => {
+  return put(`/chat/conversations/${conversationId}/read`, undefined, true);
 };
 
 // 获取未读消息数量

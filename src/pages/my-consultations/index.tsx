@@ -1,6 +1,7 @@
 import { View, Text, Image } from '@tarojs/components'
-import Taro from '@tarojs/taro'
-import { useState } from 'react'
+import Taro, { useDidShow } from '@tarojs/taro'
+import { useState, useEffect } from 'react'
+import { getConversations } from '@/services/api'
 import './index.scss'
 
 interface Consultation {
@@ -15,46 +16,58 @@ interface Consultation {
 }
 
 export default function MyConsultations() {
-  const [consultations] = useState<Consultation[]>([
-    {
-      id: '1',
-      designerId: '1',
-      designerName: '张设计师',
-      designerAvatar: 'https://via.placeholder.com/80x80/667eea/ffffff?text=张',
-      lastMessage: '好的，我会尽快给您出一份设计方案',
-      time: '今天 14:30',
-      unreadCount: 2,
-      caseTitle: '现代简约 · 三居室'
-    },
-    {
-      id: '2',
-      designerId: '2',
-      designerName: '李设计师',
-      designerAvatar: 'https://via.placeholder.com/80x80/764ba2/ffffff?text=李',
-      lastMessage: '这个预算是可以做的，我们可以约个时间详谈',
-      time: '昨天 10:15',
-      unreadCount: 0,
-      caseTitle: '北欧风格 · 两居室'
-    },
-    {
-      id: '3',
-      designerId: '3',
-      designerName: '王设计师',
-      designerAvatar: 'https://via.placeholder.com/80x80/f093fb/ffffff?text=王',
-      lastMessage: '感谢您的咨询，期待为您服务',
-      time: '3天前',
-      unreadCount: 0
-    },
-    {
-      id: '4',
-      designerId: '0',
-      designerName: '客服',
-      designerAvatar: 'https://via.placeholder.com/80x80/4facfe/ffffff?text=客服',
-      lastMessage: '您好，请问有什么可以帮到您的？',
-      time: '1周前',
-      unreadCount: 0
+  const [consultations, setConsultations] = useState<Consultation[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const loadConsultations = async () => {
+    try {
+      setLoading(true)
+      const res = await getConversations()
+      if (res.success && res.data) {
+        const formatted = res.data.map((item: any) => ({
+          id: item._id,
+          designerId: item.participants?.find((p: any) => p._id !== item.currentUser)?.id || '',
+          designerName: item.participants?.find((p: any) => p._id !== item.currentUser)?.nickname || '未知用户',
+          designerAvatar: item.participants?.find((p: any) => p._id !== item.currentUser)?.avatar || '',
+          lastMessage: item.lastMessage?.content || '',
+          time: formatTime(item.updatedAt),
+          unreadCount: item.unreadCount || 0,
+          caseTitle: item.case?.title
+        }))
+        setConsultations(formatted)
+      }
+    } catch (error) {
+      console.error('加载对话列表失败:', error)
+    } finally {
+      setLoading(false)
     }
-  ])
+  }
+
+  const formatTime = (dateStr: string) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+    const days = Math.floor(diff / (24 * 3600 * 1000))
+
+    if (days === 0) {
+      return `今天 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+    } else if (days === 1) {
+      return '昨天'
+    } else if (days < 7) {
+      return `${days}天前`
+    } else {
+      return `${date.getMonth() + 1}月${date.getDate()}日`
+    }
+  }
+
+  useEffect(() => {
+    loadConsultations()
+  }, [])
+
+  useDidShow(() => {
+    loadConsultations()
+  })
 
   const handleChatClick = (consultation: Consultation) => {
     const caseParam = consultation.caseTitle ? `&caseTitle=${encodeURIComponent(consultation.caseTitle)}` : ''
@@ -63,26 +76,17 @@ export default function MyConsultations() {
     })
   }
 
-  const handleDelete = (consultationId: string, e: any) => {
-    e.stopPropagation()
-    Taro.showModal({
-      title: '提示',
-      content: '确认删除该咨询记录吗？',
-      confirmColor: '#ff4d4f',
-      success: (res) => {
-        if (res.confirm) {
-          Taro.showToast({
-            title: '删除成功',
-            icon: 'success',
-            duration: 1500
-          })
-          // 实际应该调用接口删除
-        }
-      }
-    })
-  }
-
   const totalUnread = consultations.reduce((sum, item) => sum + item.unreadCount, 0)
+
+  if (loading) {
+    return (
+      <View className='my-consultations-page'>
+        <View className='loading-state'>
+          <Text>加载中...</Text>
+        </View>
+      </View>
+    )
+  }
 
   return (
     <View className='my-consultations-page'>
