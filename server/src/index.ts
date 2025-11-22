@@ -26,13 +26,13 @@ const PORT = envConfig.PORT;
 const getCorsOrigin = (): string | string[] | boolean => {
   const origins = envConfig.ALLOWED_ORIGINS;
   if (envConfig.NODE_ENV === 'production') {
-    if (!origins) {
+    if (!origins || origins.length === 0) {
       logger.warn('警告：生产环境未配置 ALLOWED_ORIGINS，将拒绝所有跨域请求');
       return false;
     }
-    return origins.split(',').map(o => o.trim());
+    return origins;
   }
-  return origins ? origins.split(',').map(o => o.trim()) : true;
+  return origins && origins.length > 0 ? origins : true;
 };
 
 // 中间件（顺序很重要）

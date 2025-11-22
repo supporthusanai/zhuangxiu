@@ -59,12 +59,8 @@ export const createLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    // 使用用户 ID 作为键（如果已认证）
-    return (req as any).userId || req.ip;
-  },
   handler: (req, res) => {
-    logger.warn(`Create rate limit exceeded for user/IP: ${(req as any).userId || req.ip}`);
+    logger.warn(`Create rate limit exceeded for IP: ${req.ip}`);
     res.status(429).json({
       success: false,
       message: '创建内容过于频繁，请稍后再试',
@@ -85,11 +81,8 @@ export const uploadLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    return (req as any).userId || req.ip;
-  },
   handler: (req, res) => {
-    logger.warn(`Upload rate limit exceeded for user/IP: ${(req as any).userId || req.ip}`);
+    logger.warn(`Upload rate limit exceeded for IP: ${req.ip}`);
     res.status(429).json({
       success: false,
       message: '上传过于频繁，请稍后再试',
@@ -132,12 +125,8 @@ export const verificationLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    // 使用手机号作为键
-    return req.body.phone || req.ip;
-  },
   handler: (req, res) => {
-    logger.warn(`Verification rate limit exceeded for phone/IP: ${req.body.phone || req.ip}`);
+    logger.warn(`Verification rate limit exceeded for IP: ${req.ip}`);
     res.status(429).json({
       success: false,
       message: '验证码发送过于频繁，请 1 小时后再试',
