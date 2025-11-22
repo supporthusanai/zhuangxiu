@@ -6,6 +6,10 @@ const SMS_CODE_EXPIRE = 300; // 5分钟过期
 const SMS_CODE_LENGTH = 6;
 const SMS_RATE_LIMIT = 60; // 60秒内只能发送一次
 
+// 开发环境内存存储（Redis 不可用时的后备方案）
+const memoryStore = new Map<string, { code: string; expireAt: number }>();
+const rateLimitStore = new Map<string, number>();
+
 // 生成随机验证码
 const generateCode = (): string => {
   let code = '';
@@ -29,23 +33,40 @@ export const sendSmsCode = async (phone: string): Promise<{ success: boolean; me
       return { success: false, message: '手机号格式不正确' };
     }
 
-    // 检查发送频率限制
-    const rateLimitKey = `sms:rate:${phone}`;
-    const isLimited = await redisClient.get(rateLimitKey);
-    if (isLimited) {
-      const ttl = await redisClient.ttl(rateLimitKey);
-      return { success: false, message: `请${ttl}秒后再试` };
-    }
-
     // 生成验证码
     const code = generateCode();
-    const codeKey = `sms:code:${phone}`;
+    const useRedis = redisClient.isOpen;
 
-    // 存储验证码到 Redis
-    await redisClient.setEx(codeKey, SMS_CODE_EXPIRE, code);
+    if (useRedis) {
+      // 使用 Redis
+      const rateLimitKey = `sms:rate:${phone}`;
+      const isLimited = await redisClient.get(rateLimitKey);
+      if (isLimited) {
+        const ttl = await redisClient.ttl(rateLimitKey);
+        return { success: false, message: `请${ttl}秒后再试` };
+      }
 
-    // 设置发送频率限制
-    await redisClient.setEx(rateLimitKey, SMS_RATE_LIMIT, '1');
+      const codeKey = `sms:code:${phone}`;
+
+      await redisClient.setEx(codeKey, SMS_CODE_EXPIRE, code);
+      await redisClient.setEx(rateLimitKey, SMS_RATE_LIMIT, '1');
+    } else {
+      // 使用内存存储（开发环境后备）
+      const now = Date.now();
+      const rateLimit = rateLimitStore.get(phone);
+      if (rateLimit && now < rateLimit) {
+        const waitSeconds = Math.ceil((rateLimit - now) / 1000);
+        return { success: false, message: `请${waitSeconds}秒后再试` };
+      }
+
+      memoryStore.set(phone, {
+        code,
+        expireAt: now + SMS_CODE_EXPIRE * 1000
+      });
+      rateLimitStore.set(phone, now + SMS_RATE_LIMIT * 1000);
+
+      logger.warn('[SMS] 使用内存存储（Redis 不可用）');
+    }
 
     // TODO: 接入真实短信服务商 (阿里云、腾讯云等)
     // 开发环境下直接打印验证码
@@ -71,17 +92,33 @@ export const verifySmsCode = async (phone: string, code: string): Promise<boolea
       return false;
     }
 
-    const codeKey = `sms:code:${phone}`;
-    const storedCode = await redisClient.get(codeKey);
+    const useRedis = redisClient.isOpen;
+    let storedCode: string | null = null;
 
-    if (!storedCode) {
-      return false;
-    }
+    if (useRedis) {
+      // 使用 Redis
+      const codeKey = `sms:code:${phone}`;
+      storedCode = await redisClient.get(codeKey);
 
-    // 验证成功后删除验证码（一次性使用）
-    if (storedCode === code) {
-      await redisClient.del(codeKey);
-      return true;
+      if (storedCode === code) {
+        await redisClient.del(codeKey);
+        return true;
+      }
+    } else {
+      // 使用内存存储
+      const stored = memoryStore.get(phone);
+      if (stored) {
+        const now = Date.now();
+        if (now > stored.expireAt) {
+          memoryStore.delete(phone);
+          return false;
+        }
+
+        if (stored.code === code) {
+          memoryStore.delete(phone);
+          return true;
+        }
+      }
     }
 
     return false;
